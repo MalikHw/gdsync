@@ -1,0 +1,11 @@
+Package: gdsync
+Version: 1.0-1
+Architecture: all
+Maintainer: MalikHw <help.malicorporation@gmail.com>
+Installed-Size: 17
+Depends: bash, adb, zenity
+Section: utils
+Priority: optional
+Homepage: https://github.com/MalikHw/gdsync
+Description: A tool to sync Geometry Dash data between mobile and PC
+ This script helps users push or pull save data for Geometry Dash between Wine on Linux and Android via ADB.
