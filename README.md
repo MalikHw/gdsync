@@ -9,6 +9,15 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 - Supports both pushing (PC → Phone) and pulling (Phone → PC) data.
 - Easy-to-use interface (GUI).
 
+## Building!
+
+just clone this repo and do a simple
+
+```
+chmod +x build.sh
+./build.sh
+```
+
 ## Installation
 
 ### For Linux (via PPA) (WIP, NOT WORKING RIGHT NOW)
