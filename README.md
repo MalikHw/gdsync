@@ -11,7 +11,7 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 
 ## Installation
 
-### For Linux (via PPA)
+### For Linux (via PPA) (WIP, NOT WORKING RIGHT NOW)
 
 To install GD Sync on your Linux machine, follow these steps:
 
@@ -24,6 +24,10 @@ then
 then
 
 `sudo apt-get install gd-sync`
+
+### For Linux via deb file
+
+just go to the releases page and get the .deb file lol
 
 
 **Android Device**: You need an Android device with USB Debugging enabled. To enable USB Debugging:
