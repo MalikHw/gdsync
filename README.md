@@ -5,10 +5,10 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 ## Screenshots
 
 ### Push Mode
-![Push Screenshot](Screenshot_2025-04-06_15-42-10.png)
+![Choosing Target](Screenshot_2025-04-06_15-42-10.png)
 
 ### Pull Mode
-![Pull Screenshot](Screenshot_2025-04-06_15-42-22.png)
+![Choosing what to transfer](Screenshot_2025-04-06_15-42-22.png)
 
 ### Success Dialog
 ![Success Screenshot](Screenshot_2025-04-06_15-42-33.png)
