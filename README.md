@@ -42,7 +42,7 @@ chmod +x build.sh
 
 just go to the *releases* page and get the **.deb** file lol
 
-### For Windows
+### For Windows (STILL IN BETA!)
 
 just download the **.exe** file from the releases tab
 
