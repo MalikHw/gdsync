@@ -2,6 +2,18 @@
 
 GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, etc.) between your Android device and your PC (Linux). With GD Sync, you can easily transfer your Geometry Dash data back and forth, ensuring that your progress is always up-to-date on both platforms.
 
+## Screenshots
+
+### Push Mode
+![Push Screenshot](Screenshot_2025-04-06_15-42-10.png)
+
+### Pull Mode
+![Pull Screenshot](Screenshot_2025-04-06_15-42-22.png)
+
+### Success Dialog
+![Success Screenshot](Screenshot_2025-04-06_15-42-33.png)
+
+
 ## Features
 
 - Only when the phone has Geode this works
