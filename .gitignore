@@ -1,0 +1,11 @@
+*.deb
+*.build
+*.changes
+*.tar.*
+*.dsc
+*.o
+*.log
+debian/files
+debian/*.debhelper*
+.gdsync-1.0/
+gdsync-1.0/
