@@ -5,13 +5,13 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 ## Screenshots
 
 ### Push Mode
-![Choosing Target](Screenshot_2025-04-06_15-42-10.png)
+![Choosing the Target:](Screenshot_2025-04-06_15-42-10.png)
 
 ### Pull Mode
-![Choosing what to transfer](Screenshot_2025-04-06_15-42-22.png)
+![Choosing what to transfer:](Screenshot_2025-04-06_15-42-22.png)
 
 ### Success Dialog
-![Success Screenshot](Screenshot_2025-04-06_15-42-33.png)
+![Success Screenshot:](Screenshot_2025-04-06_15-42-33.png)
 
 
 ## Features
@@ -56,3 +56,7 @@ just go to the releases page and get the .deb file lol
     Go to *Settings* → *About Phone* → Tap on *Build Number* multiple times to unlock *Developer Options.*
 
     Go to *Developer Options* → *Enable USB Debugging.*
+
+
+
+# WIndows Version, WIP
