@@ -4,13 +4,13 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 
 ## Screenshots
 
-### Push Mode
+### Choosing the Target:
 ![Choosing the Target:](Screenshot_2025-04-06_15-42-10.png)
 
-### Pull Mode
+### Choosing what to transfer:
 ![Choosing what to transfer:](Screenshot_2025-04-06_15-42-22.png)
 
-### Success Dialog
+### Success Screenshot:
 ![Success Screenshot:](Screenshot_2025-04-06_15-42-33.png)
 
 
@@ -53,9 +53,9 @@ just go to the releases page and get the .deb file lol
 
 **Android Device**: You need an Android device with USB Debugging enabled. To enable USB Debugging:
 
-    Go to *Settings* → *About Phone* → Tap on *Build Number* multiple times to unlock *Developer Options.*
+Go to *Settings* → *About Phone* → Tap on *Build Number* multiple times to unlock *Developer Options.*
 
-    Go to *Developer Options* → *Enable USB Debugging.*
+Go to *Developer Options* → *Enable USB Debugging.*
 
 
 
