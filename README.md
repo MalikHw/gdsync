@@ -1,6 +1,6 @@
 # GD Sync - Geometry Dash Data Sync Tool
 
-GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, etc.) between your Android device and your PC (Linux). With GD Sync, you can easily transfer your Geometry Dash data back and forth, ensuring that your progress is always up-to-date on both platforms.
+GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, etc.) between your Android device and your PC. With GD Sync, you can easily transfer your Geometry Dash data back and forth, ensuring that your progress is always up-to-date on both platforms.
 
 ## Dependcies:
 ```
@@ -18,6 +18,8 @@ sudo apt install adb zenity -y
 
 ### Success Screenshot:
 ![Success Screenshot:](Screenshot_2025-04-06_15-42-33.png)
+
+## [Video](https://youtube.com/shorts/-qPORQZXI6k?feature=share)
 
 
 ## Features
@@ -52,7 +54,12 @@ Go to *Settings* → *About Phone* → Tap on *Build Number* multiple times to u
 
 Go to *Developer Options* → *Enable USB Debugging.*
 
--if you liked my project, can you leave me a small donation? [ko-fi](https://www.ko-fi.com/MalikHw47)
+- if you liked my project, can you leave me a small donation? [ko-fi](https://www.ko-fi.com/MalikHw47)
+
+## To-Do:
+
+- better GUI
+- also sync Geode mods
 
 ## Bugs or fixes
 
