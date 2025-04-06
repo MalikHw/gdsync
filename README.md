@@ -42,6 +42,9 @@ chmod +x build.sh
 
 just go to the *releases* page and get the **.deb** file lol
 
+### For Windows
+
+just download the **.exe** file from the releases tab
 
 **Android Device**: You need an Android device with USB Debugging enabled. To enable USB Debugging:
 
@@ -49,6 +52,8 @@ Go to *Settings* → *About Phone* → Tap on *Build Number* multiple times to u
 
 Go to *Developer Options* → *Enable USB Debugging.*
 
-# WIndows Version, WIP
-
 -if you liked my project, can you leave me a small donation? [ko-fi](https://www.ko-fi.com/MalikHw47)
+
+## Bugs or fixes
+
+- feel free to open an issue
