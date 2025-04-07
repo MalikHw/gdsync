@@ -1,7 +1,17 @@
 #!/bin/bash
 
-PC_GD_PATH="$HOME/.wine/drive_c/users/$USER/AppData/Local/GeometryDash"
-PHONE_GD_PATH="/storage/emulated/0/Android/media/com.geode.launcher/save"
+CONFIG_FILE="$HOME/.config/gdsync.conf"
+
+DEFAULT_PC_GD_PATH="$HOME/.wine/drive_c/users/$USER/AppData/Local/GeometryDash"
+DEFAULT_PHONE_GD_PATH="/storage/emulated/0/Android/media/com.geode.launcher/save"
+
+# Load config or use defaults
+if [ -f "$CONFIG_FILE" ]; then
+    source "$CONFIG_FILE"
+else
+    PC_GD_PATH="$DEFAULT_PC_GD_PATH"
+    PHONE_GD_PATH="$DEFAULT_PHONE_GD_PATH"
+fi
 
 USERDATA_FILES=(
     "CCLocalLevels.dat"
@@ -10,220 +20,151 @@ USERDATA_FILES=(
     "CCGameManager2.dat"
 )
 
-if ! command -v zenity &> /dev/null; then
-    echo "Error: Zenity is not installed. Please install it with your package manager."
-    exit 1
-fi
-
-if ! command -v adb &> /dev/null; then
-    zenity --error --title="ADB Not Found" --text="ADB is not installed or not in your PATH. Please install Android Debug Bridge and try again."
-    exit 1
-fi
-
-if ! adb devices | grep -q "device$"; then
-    zenity --error --title="No Device Found" --text="No Android device found. Please connect your device, enable USB debugging, and try again."
-    exit 1
-fi
-
-open_donation() {
-    if command -v xdg-open &> /dev/null; then
-        xdg-open "https://ko-fi.com/MalikHw47"
-    elif command -v open &> /dev/null; then
-        open "https://ko-fi.com/MalikHw47"
-    elif command -v start &> /dev/null; then
-        start "https://ko-fi.com/MalikHw47"
-    else
-        zenity --info --title="Donation Link" --text="Please visit: https://ko-fi.com/MalikHw47"
-    fi
+is_game_running() {
+    pgrep -f "GeometryDash.exe" > /dev/null && return 0
+    pgrep -f "steamapps.*GeometryDash" > /dev/null && return 0
+    return 1
 }
 
+save_config() {
+    mkdir -p "$(dirname "$CONFIG_FILE")"
+    cat > "$CONFIG_FILE" <<EOF
+PC_GD_PATH="$PC_GD_PATH"
+PHONE_GD_PATH="$PHONE_GD_PATH"
+EOF
+}
+
+show_settings() {
+    PC_GD_PATH=$(zenity --entry --title="PC Geometry Dash Path" \
+        --text="Enter the path to Geometry Dash's save data on your PC:" \
+        --entry-text="$PC_GD_PATH")
+
+    PHONE_GD_PATH=$(zenity --entry --title="Phone Geometry Dash Path" \
+        --text="Enter the path on your Android device:" \
+        --entry-text="$PHONE_GD_PATH")
+
+    save_config
+}
+
+open_donation() {
+    xdg-open "https://ko-fi.com/MalikHw47" 2>/dev/null || \
+    zenity --info --title="Donation Link" --text="Visit: https://ko-fi.com/MalikHw47"
+}
+
+backup_file() {
+    local filepath="$1"
+    [ -f "$filepath" ] && cp "$filepath" "$filepath.bak"
+}
+
+main_menu() {
+    ACTION=$(zenity --list --title="GDSync Launcher" \
+        --text="Welcome to Geometry Dash Sync!" \
+        --column="Action" "Sync" "Settings" "Exit")
+
+    case "$ACTION" in
+        "Settings")
+            show_settings
+            main_menu
+            ;;
+        "Sync")
+            main
+            ;;
+        *)
+            exit 0
+            ;;
+    esac
+}
 
 main() {
+    if ! command -v zenity &> /dev/null; then
+        echo "Zenity is required. Please install it."
+        exit 1
+    fi
+
+    if ! command -v adb &> /dev/null; then
+        zenity --error --title="ADB Not Found" --text="ADB is not installed. Please install it."
+        exit 1
+    fi
+
+    if ! adb devices | grep -q "device$"; then
+        zenity --error --title="No Device Found" --text="No Android device detected. Enable USB debugging and try again."
+        exit 1
+    fi
+
+    if is_game_running; then
+        zenity --warning --title="Game is Running" --text="Geometry Dash is running. Please close it before syncing."
+        exit 1
+    fi
+
     DIRECTION=$(zenity --list --radiolist \
         --title="Geometry Dash Sync" \
         --text="Choose sync direction:" \
         --column="Select" --column="Direction" \
         TRUE "Push (PC → Phone)" \
         FALSE "Pull (Phone → PC)")
-    
-    if [ $? -ne 0 ]; then
-        zenity --info --title="Operation Canceled" --text="Sync operation canceled."
-        exit 0
-    fi
-    
+
     MODE=$(zenity --list --radiolist \
         --title="Geometry Dash Sync" \
-        --text="Choose which files to sync:" \
+        --text="Choose sync mode:" \
         --column="Select" --column="Mode" \
-        TRUE "User Data Only (Levels & Progress)" \
-        FALSE "All Files (Everything except subfolders)")
-    
-    if [ $? -ne 0 ]; then
-        zenity --info --title="Operation Canceled" --text="Sync operation canceled."
-        exit 0
+        TRUE "User Data Only" \
+        FALSE "All Files")
+
+    if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+        push_data "$MODE"
+    else
+        pull_data "$MODE"
     fi
-    
-    if ! zenity --question --title="Confirm Operation" \
-        --text="Are you sure you want to proceed with:\n\nDirection: $DIRECTION\nMode: $MODE"; then
-        zenity --info --title="Operation Canceled" --text="Sync operation canceled."
-        exit 0
-    fi
-    
-    case "$DIRECTION" in
-        "Push (PC → Phone)")
-            push_data "$MODE"
-            ;;
-        "Pull (Phone → PC)")
-            pull_data "$MODE"
-            ;;
-        *)
-            zenity --error --title="Error" --text="Invalid direction selected."
-            exit 1
-            ;;
-    esac
 }
 
 push_data() {
     MODE="$1"
-    
-    (
-        echo "0"; echo "# Preparing to push data to phone..."
-        
-        adb shell "mkdir -p $PHONE_GD_PATH"
-        
-        echo "10"; echo "# Checking source files..."
-        
-        if [ ! -d "$PC_GD_PATH" ]; then
-            zenity --error --title="Error" --text="Source directory not found: $PC_GD_PATH"
-            exit 1
-        fi
-        
-        if [[ "$MODE" == "User Data Only (Levels & Progress)" ]]; then
-            TOTAL_FILES=${#USERDATA_FILES[@]}
-            CURRENT=0
-            
-            for file in "${USERDATA_FILES[@]}"; do
-                CURRENT=$((CURRENT + 1))
-                PROGRESS=$((10 + (CURRENT * 80 / TOTAL_FILES)))
-                
-                echo "$PROGRESS"; echo "# Pushing $file to phone..."
-                
-                if [ -f "$PC_GD_PATH/$file" ]; then
-                    adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/" > /dev/null
-                else
-                    echo "$PROGRESS"; echo "# Warning: $file not found, skipping..."
-                    sleep 1
-                fi
-            done
-        else
-            echo "20"; echo "# Pushing all files to phone..."
-            
-            FILES=$(find "$PC_GD_PATH" -maxdepth 1 -type f)
-            TOTAL_FILES=$(echo "$FILES" | wc -l)
-            CURRENT=0
-            
-            while IFS= read -r file; do
-                CURRENT=$((CURRENT + 1))
-                FILENAME=$(basename "$file")
-                PROGRESS=$((20 + (CURRENT * 70 / TOTAL_FILES)))
-                
-                echo "$PROGRESS"; echo "# Pushing $FILENAME to phone..."
-                adb push "$file" "$PHONE_GD_PATH/" > /dev/null
-            done <<< "$FILES"
-        fi
-        
-        echo "100"; echo "# Transfer complete!"
-    ) | zenity --progress \
-          --title="Syncing Geometry Dash Data" \
-          --text="Starting transfer..." \
-          --percentage=0 \
-          --auto-close \
-          --no-cancel
-    
-    if [ $? -eq 0 ]; then
-        zenity --info --title="Success" --text="Data successfully pushed to phone!"
-        show_donation_prompt
+    adb shell "mkdir -p $PHONE_GD_PATH"
+
+    if [[ "$MODE" == "User Data Only" ]]; then
+        for file in "${USERDATA_FILES[@]}"; do
+            [ -f "$PC_GD_PATH/$file" ] && adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/"
+        done
     else
-        zenity --error --title="Error" --text="There was an error during the transfer."
+        for file in "$PC_GD_PATH"/*; do
+            [ -f "$file" ] && adb push "$file" "$PHONE_GD_PATH/"
+        done
     fi
+
+    zenity --info --title="Success" --text="Files pushed to phone!"
+    show_donation_prompt
 }
 
 pull_data() {
     MODE="$1"
-    
-    (
-        echo "0"; echo "# Preparing to pull data from phone..."
-        
-        mkdir -p "$PC_GD_PATH"
-        
-        echo "10"; echo "# Checking source files on phone..."
-        
-        if ! adb shell "[ -d $PHONE_GD_PATH ] && echo exists" | grep -q "exists"; then
-            zenity --error --title="Error" --text="Source directory not found on phone: $PHONE_GD_PATH"
-            exit 1
-        fi
-        
-        if [[ "$MODE" == "User Data Only (Levels & Progress)" ]]; then
-            TOTAL_FILES=${#USERDATA_FILES[@]}
-            CURRENT=0
-            
-            for file in "${USERDATA_FILES[@]}"; do
-                CURRENT=$((CURRENT + 1))
-                PROGRESS=$((10 + (CURRENT * 80 / TOTAL_FILES)))
-                
-                echo "$PROGRESS"; echo "# Pulling $file from phone..."
-                
-                if adb shell "[ -f $PHONE_GD_PATH/$file ] && echo exists" | grep -q "exists"; then
-                    adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/" > /dev/null
-                else
-                    echo "$PROGRESS"; echo "# Warning: $file not found on phone, skipping..."
-                    sleep 1
-                fi
-            done
-        else
-            echo "20"; echo "# Pulling file list from phone..."
-            
-            FILES=$(adb shell "find $PHONE_GD_PATH -maxdepth 1 -type f")
-            TOTAL_FILES=$(echo "$FILES" | wc -l)
-            CURRENT=0
-            
-            while IFS= read -r file_path; do
-                # Skip empty lines
-                if [[ -z "$file_path" ]]; then
-                    continue
-                fi
-                
-                CURRENT=$((CURRENT + 1))
-                FILENAME=$(basename "$file_path")
-                PROGRESS=$((20 + (CURRENT * 70 / TOTAL_FILES)))
-                
-                echo "$PROGRESS"; echo "# Pulling $FILENAME from phone..."
-                adb pull "$file_path" "$PC_GD_PATH/" > /dev/null
-            done <<< "$FILES"
-        fi
-        
-        echo "100"; echo "# Transfer complete!"
-    ) | zenity --progress \
-          --title="Syncing Geometry Dash Data" \
-          --text="Starting transfer..." \
-          --percentage=0 \
-          --auto-close \
-          --no-cancel
-    
-    if [ $? -eq 0 ]; then
-        zenity --info --title="Success" --text="Data successfully pulled from phone!"
-        show_donation_prompt
+    mkdir -p "$PC_GD_PATH"
+
+    if [[ "$MODE" == "User Data Only" ]]; then
+        for file in "${USERDATA_FILES[@]}"; do
+            if adb shell "[ -f $PHONE_GD_PATH/$file ]"; then
+                backup_file "$PC_GD_PATH/$file"
+                adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/"
+            fi
+        done
     else
-        zenity --error --title="Error" --text="There was an error during the transfer."
+        FILES=$(adb shell "find $PHONE_GD_PATH -maxdepth 1 -type f")
+        while IFS= read -r file; do
+            fname=$(basename "$file")
+            backup_file "$PC_GD_PATH/$fname"
+            adb pull "$file" "$PC_GD_PATH/"
+        done <<< "$FILES"
     fi
+
+    zenity --info --title="Success" --text="Files pulled from phone!"
+    show_donation_prompt
 }
 
 show_donation_prompt() {
     if zenity --question --title="Support the Developer" \
-        --text="GD Sync Tool by MalikHw47\n\nIf you found this tool useful, would you like to leave a donation?" \
-        --ok-label="Donate" --cancel-label="Maybe Later"; then
+        --text="Like GDSync?\n\nConsider donating to MalikHw47!" \
+        --ok-label="Donate" --cancel-label="Later"; then
         open_donation
     fi
 }
 
-main
+main_menu
