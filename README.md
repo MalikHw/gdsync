@@ -2,7 +2,16 @@
 
 GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, etc.) between your Android device and your PC. With GD Sync, you can easily transfer your Geometry Dash data back and forth, ensuring that your progress is always up-to-date on both platforms.
 
-## Dependcies:
+## Pro Version Features:
+
+- Geode Mods Sync
+- [GDH](https://github.com/TobyAdd/GDH) replays sync
+- Background sync (wont implement for Windows)
+- Smart Sync (syncs only newly added files)
+
+* buy from **[HERE](https://ko-fi.com/s/ca68e585d2)**, when u join the server contact me from there and send screenshot, and i will send u an acivation key
+
+## Dependcies (if the deb file wont install):
 ```
 sudo apt update
 sudo apt install adb zenity -y
@@ -58,8 +67,7 @@ Go to *Developer Options* → *Enable USB Debugging.*
 
 ## To-Do:
 
-- better GUI
-- also sync Geode mods
+- Sync to the phone to Geometry Dash directly (no Geode)(only with a Rooted Phone)
 
 ## Bugs or fixes
 
