@@ -1,17 +1,49 @@
 #!/bin/bash
 
 CONFIG_FILE="$HOME/.config/gdsync.conf"
+LICENSE_FILE="$HOME/.config/gdsync.license"
 
 DEFAULT_PC_GD_PATH="$HOME/.wine/drive_c/users/$USER/AppData/Local/GeometryDash"
 DEFAULT_PHONE_GD_PATH="/storage/emulated/0/Android/media/com.geode.launcher/save"
+DEFAULT_PC_GEODE_PATH="$HOME/.steam/steam/steamapps/common/Geometry Dash/geode/mods"
+DEFAULT_PHONE_GEODE_PATH="/storage/emulated/0/Android/media/com.geode.launcher/game/geode/mods"
+DEFAULT_PC_GDH_PATH="$HOME/.wine/drive_c/users/$USER/AppData/Local/GeometryDash/geode/mods/tobyadd.gdh/Macros"
+DEFAULT_PHONE_GDH_PATH="/storage/emulated/0/Android/media/com.geode.launcher/save/geode/mods/tobyadd.gdh/Macros"
 
-# Load config or use defaults
+VALID_KEYS=(
+    "...DONTTRYTHISYOUFUCKER"
+)
+
+PRO_ENABLED=false
+BACKGROUND_SYNC=false
+
 if [ -f "$CONFIG_FILE" ]; then
     source "$CONFIG_FILE"
 else
     PC_GD_PATH="$DEFAULT_PC_GD_PATH"
     PHONE_GD_PATH="$DEFAULT_PHONE_GD_PATH"
+    PC_GEODE_PATH="$DEFAULT_PC_GEODE_PATH"
+    PHONE_GEODE_PATH="$DEFAULT_PHONE_GEODE_PATH"
+    PC_GDH_PATH="$DEFAULT_PC_GDH_PATH"
+    PHONE_GDH_PATH="$DEFAULT_PHONE_GDH_PATH"
 fi
+
+if [ -f "$LICENSE_FILE" ]; then
+    source "$LICENSE_FILE"
+    for key in "${VALID_KEYS[@]}"; do
+        if [ "$LICENSE_KEY" == "$key" ]; then
+            PRO_ENABLED=true
+            break
+        fi
+    done
+fi
+
+CRITICAL_USERDATA_FILES=(
+    "CCLocalLevels.dat"
+    "CCLocalLevels2.dat"
+    "CCGameManager.dat"
+    "CCGameManager2.dat"
+)
 
 USERDATA_FILES=(
     "CCLocalLevels.dat"
@@ -20,10 +52,27 @@ USERDATA_FILES=(
     "CCGameManager2.dat"
 )
 
+is_critical_file() {
+    local filename="$1"
+    for critical_file in "${CRITICAL_USERDATA_FILES[@]}"; do
+        if [ "$filename" = "$critical_file" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 is_game_running() {
     pgrep -f "GeometryDash.exe" > /dev/null && return 0
     pgrep -f "steamapps.*GeometryDash" > /dev/null && return 0
     return 1
+}
+
+check_geode_installed() {
+    if ! adb shell "[ -d $PHONE_GEODE_PATH ]" && ! adb shell "[ -d $(dirname $PHONE_GEODE_PATH) ]"; then
+        zenity --error --title="Geode Not Found" --text="Geode doesn't appear to be installed on your phone. Please install Geode first."
+        exit 1
+    fi
 }
 
 save_config() {
@@ -31,43 +80,59 @@ save_config() {
     cat > "$CONFIG_FILE" <<EOF
 PC_GD_PATH="$PC_GD_PATH"
 PHONE_GD_PATH="$PHONE_GD_PATH"
+PC_GEODE_PATH="$PC_GEODE_PATH"
+PHONE_GEODE_PATH="$PHONE_GEODE_PATH"
+PC_GDH_PATH="$PC_GDH_PATH"
+PHONE_GDH_PATH="$PHONE_GDH_PATH"
 EOF
 }
 
-show_settings() {
-    PC_GD_PATH=$(zenity --entry --title="PC Geometry Dash Path" \
-        --text="Enter the path to Geometry Dash's save data on your PC:" \
-        --entry-text="$PC_GD_PATH")
-
-    PHONE_GD_PATH=$(zenity --entry --title="Phone Geometry Dash Path" \
-        --text="Enter the path on your Android device:" \
-        --entry-text="$PHONE_GD_PATH")
-
-    save_config
+save_license() {
+    mkdir -p "$(dirname "$LICENSE_FILE")"
+    cat > "$LICENSE_FILE" <<EOF
+LICENSE_KEY="$LICENSE_KEY"
+EOF
 }
 
-open_donation() {
-    xdg-open "https://ko-fi.com/MalikHw47" 2>/dev/null || \
-    zenity --info --title="Donation Link" --text="Visit: https://ko-fi.com/MalikHw47"
+open_activation_page() {
+    xdg-open "https://ko-fi.com/s/ca68e585d2" 2>/dev/null || \
+    zenity --info --title="Activation Code" --text="Visit: https://ko-fi.com/s/ca68e585d2"
 }
 
-backup_file() {
-    local filepath="$1"
-    [ -f "$filepath" ] && cp "$filepath" "$filepath.bak"
-}
+activate_pro() {
+    if [ "$PRO_ENABLED" = true ]; then
+        zenity --info --title="Pro Status" --text="Pro version is already activated!"
+        return
+    fi
 
-main_menu() {
-    ACTION=$(zenity --list --title="GDSync Launcher" \
-        --text="Welcome to Geometry Dash Sync!" \
-        --column="Action" "Sync" "Settings" "Exit")
+    ACTIVATE_ACTION=$(zenity --list --title="Pro Activation" \
+        --text="Activate GDSync Pro:" \
+        --column="Action" "Enter License Key" "Get Activation Code" "Cancel")
+        
+    case "$ACTIVATE_ACTION" in
+        "Enter License Key")
+            LICENSE_KEY=$(zenity --entry --title="Pro Activation" \
+                --text="Enter your license key:" \
+                --entry-text="")
 
-    case "$ACTION" in
-        "Settings")
-            show_settings
-            main_menu
+            if [ -z "$LICENSE_KEY" ]; then
+                exit 0
+            fi
+
+            for key in "${VALID_KEYS[@]}"; do
+                if [ "$LICENSE_KEY" == "$key" ]; then
+                    PRO_ENABLED=true
+                    save_license
+                    zenity --info --title="Activation Successful" --text="Pro features are now active!"
+                    return
+                fi
+            done
+
+            zenity --error --title="Invalid Key" --text="The license key is invalid. Please try again."
+            exit 0
             ;;
-        "Sync")
-            main
+        "Get Activation Code")
+            open_activation_page
             ;;
         *)
             exit 0
@@ -75,7 +140,133 @@ main_menu() {
     esac
 }
 
-main() {
+open_donation() {
+    xdg-open "https://ko-fi.com/MalikHw47" 2>/dev/null || \
+    zenity --info --title="Donation Link" --text="Visit: https://ko-fi.com/MalikHw47"
+}
+
+show_settings() {
+    PC_GD_PATH=$(zenity --entry --title="PC Geometry Dash Path" \
+        --text="Enter the path to Geometry Dash's save data on your PC:" \
+        --entry-text="$PC_GD_PATH")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
+
+    PHONE_GD_PATH=$(zenity --entry --title="Phone Geometry Dash Path" \
+        --text="Enter the path on your Android device:" \
+        --entry-text="$PHONE_GD_PATH")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
+
+    if [ "$PRO_ENABLED" = true ]; then
+        PC_GEODE_PATH=$(zenity --entry --title="PC Geode Mods Path" \
+            --text="Enter the path to Geode mods on your PC:" \
+            --entry-text="$DEFAULT_PC_GEODE_PATH")
+        
+        if [ $? -ne 0 ]; then
+            exit 0
+        fi
+
+        PHONE_GEODE_PATH=$(zenity --entry --title="Phone Geode Mods Path" \
+            --text="Enter the path to Geode mods on your Android device:" \
+            --entry-text="$DEFAULT_PHONE_GEODE_PATH")
+        
+        if [ $? -ne 0 ]; then
+            exit 0
+        fi
+
+        PC_GDH_PATH=$(zenity --entry --title="PC GDH Replays Path" \
+            --text="Enter the path to GDH replays on your PC:" \
+            --entry-text="$DEFAULT_PC_GDH_PATH")
+        
+        if [ $? -ne 0 ]; then
+            exit 0
+        fi
+
+        PHONE_GDH_PATH=$(zenity --entry --title="Phone GDH Replays Path" \
+            --text="Enter the path to GDH replays on your Android device:" \
+            --entry-text="$DEFAULT_PHONE_GDH_PATH")
+        
+        if [ $? -ne 0 ]; then
+            exit 0
+        fi
+    fi
+
+    save_config
+}
+
+backup_file() {
+    local filepath="$1"
+    [ -f "$filepath" ] && cp "$filepath" "$filepath.bak"
+}
+
+show_status_notification() {
+    local message="$1"
+    if [ "$BACKGROUND_SYNC" = true ]; then
+        notify-send "GDSync" "$message"
+    else
+        echo "$message"
+    fi
+}
+
+main_menu() {
+    local pro_status="Activate Pro"
+    local pro_options=()
+    
+    if [ "$PRO_ENABLED" = true ]; then
+        pro_status="Pro: Active ✓"
+        pro_options+=("Sync Geode Mods" "Sync GDH Replays")
+    fi
+
+    ACTION=$(zenity --list --title="GDSync Launcher" \
+        --text="Welcome to Geometry Dash Sync!" \
+        --column="Action" "Sync Game Data" "Settings" "$pro_status" "${pro_options[@]}" "Exit")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
+
+    case "$ACTION" in
+        "Settings")
+            show_settings
+            main_menu
+            ;;
+        "Sync Game Data")
+            sync_game_data
+            ;;
+        "Sync Geode Mods")
+            if [ "$PRO_ENABLED" = true ]; then
+                check_geode_installed
+                sync_geode_mods
+            else
+                activate_pro
+            fi
+            main_menu
+            ;;
+        "Sync GDH Replays")
+            if [ "$PRO_ENABLED" = true ]; then
+                check_geode_installed
+                sync_gdh_replays
+            else
+                activate_pro
+            fi
+            main_menu
+            ;;
+        "Activate Pro" | "Pro: Active ✓")
+            activate_pro
+            main_menu
+            ;;
+        *)
+            exit 0
+            ;;
+    esac
+}
+
+sync_game_data() {
     if ! command -v zenity &> /dev/null; then
         echo "Zenity is required. Please install it."
         exit 1
@@ -96,24 +287,68 @@ main() {
         exit 1
     fi
 
+    local options=("Push (PC → Phone)" "Pull (Phone → PC)")
+    local smart_option=""
+    local background_option=""
+
+    if [ "$PRO_ENABLED" = true ]; then
+        smart_option="Smart Sync (Only New Files)"
+        background_option="Background Sync"
+    fi
+
     DIRECTION=$(zenity --list --radiolist \
         --title="Geometry Dash Sync" \
         --text="Choose sync direction:" \
         --column="Select" --column="Direction" \
-        TRUE "Push (PC → Phone)" \
-        FALSE "Pull (Phone → PC)")
+        TRUE "${options[0]}" \
+        FALSE "${options[1]}")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
 
-    MODE=$(zenity --list --radiolist \
+    MODE=$(zenity --list --checklist \
         --title="Geometry Dash Sync" \
-        --text="Choose sync mode:" \
-        --column="Select" --column="Mode" \
+        --text="Choose sync options:" \
+        --column="Select" --column="Option" \
         TRUE "User Data Only" \
-        FALSE "All Files")
+        FALSE "All Files" \
+        $([ -n "$smart_option" ] && echo "FALSE \"$smart_option\"") \
+        $([ -n "$background_option" ] && echo "FALSE \"$background_option\""))
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
 
-    if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
-        push_data "$MODE"
+    SMART_SYNC=false
+    BACKGROUND_SYNC=false
+    
+    if [ "$PRO_ENABLED" = true ]; then
+        if [[ $MODE == *"Smart Sync"* ]]; then
+            SMART_SYNC=true
+        fi
+        
+        if [[ $MODE == *"Background Sync"* ]]; then
+            BACKGROUND_SYNC=true
+        fi
+    fi
+
+    if [ "$BACKGROUND_SYNC" = true ]; then
+        {
+            if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+                push_data "$MODE"
+            else
+                pull_data "$MODE"
+            fi
+        } &
+        
+        zenity --notification --text="GDSync is running in the background" --timeout=5
     else
-        pull_data "$MODE"
+        if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+            push_data "$MODE"
+        else
+            pull_data "$MODE"
+        fi
     fi
 }
 
@@ -121,42 +356,383 @@ push_data() {
     MODE="$1"
     adb shell "mkdir -p $PHONE_GD_PATH"
 
-    if [[ "$MODE" == "User Data Only" ]]; then
+    USER_DATA_ONLY=false
+    if [[ "$MODE" == *"User Data Only"* ]]; then
+        USER_DATA_ONLY=true
+    fi
+
+    if [ "$USER_DATA_ONLY" = true ]; then
         for file in "${USERDATA_FILES[@]}"; do
-            [ -f "$PC_GD_PATH/$file" ] && adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/"
+            if [ -f "$PC_GD_PATH/$file" ]; then
+                if is_critical_file "$file" || [ "$SMART_SYNC" = false ]; then
+                    show_status_notification "Pushing: $file"
+                    adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/"
+                else
+                    if adb shell "[ -f $PHONE_GD_PATH/$file ]"; then
+                        PC_TIME=$(stat -c %Y "$PC_GD_PATH/$file")
+                        PHONE_TIME=$(adb shell "stat -c %Y $PHONE_GD_PATH/$file" 2>/dev/null || echo 0)
+                        
+                        if [ $PC_TIME -gt $PHONE_TIME ]; then
+                            show_status_notification "Pushing newer file: $file"
+                            adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/"
+                        else
+                            show_status_notification "Skipping $file (not modified)"
+                        fi
+                    else
+                        show_status_notification "Pushing new file: $file"
+                        adb push "$PC_GD_PATH/$file" "$PHONE_GD_PATH/"
+                    fi
+                fi
+            fi
         done
     else
         for file in "$PC_GD_PATH"/*; do
-            [ -f "$file" ] && adb push "$file" "$PHONE_GD_PATH/"
+            if [ -f "$file" ]; then
+                filename=$(basename "$file")
+                
+                if is_critical_file "$filename" || [ "$SMART_SYNC" = false ]; then
+                    show_status_notification "Pushing: $filename"
+                    adb push "$file" "$PHONE_GD_PATH/"
+                else
+                    if adb shell "[ -f $PHONE_GD_PATH/$filename ]"; then
+                        PC_TIME=$(stat -c %Y "$file")
+                        PHONE_TIME=$(adb shell "stat -c %Y $PHONE_GD_PATH/$filename" 2>/dev/null || echo 0)
+                        
+                        if [ $PC_TIME -gt $PHONE_TIME ]; then
+                            show_status_notification "Pushing newer file: $filename"
+                            adb push "$file" "$PHONE_GD_PATH/"
+                        else
+                            show_status_notification "Skipping $filename (not modified)"
+                        fi
+                    else
+                        show_status_notification "Pushing new file: $filename"
+                        adb push "$file" "$PHONE_GD_PATH/"
+                    fi
+                fi
+            fi
         done
     fi
 
-    zenity --info --title="Success" --text="Files pushed to phone!"
-    show_donation_prompt
+    if [ "$BACKGROUND_SYNC" = false ]; then
+        zenity --info --title="Success" --text="Files pushed to phone!"
+        show_donation_prompt
+    else
+        notify-send "GDSync" "Files pushed to phone successfully!"
+    fi
 }
 
 pull_data() {
     MODE="$1"
     mkdir -p "$PC_GD_PATH"
 
-    if [[ "$MODE" == "User Data Only" ]]; then
+    USER_DATA_ONLY=false
+    if [[ "$MODE" == *"User Data Only"* ]]; then
+        USER_DATA_ONLY=true
+    fi
+
+    if [ "$USER_DATA_ONLY" = true ]; then
         for file in "${USERDATA_FILES[@]}"; do
             if adb shell "[ -f $PHONE_GD_PATH/$file ]"; then
-                backup_file "$PC_GD_PATH/$file"
-                adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/"
+                if is_critical_file "$file" || [ "$SMART_SYNC" = false ]; then
+                    show_status_notification "Pulling: $file"
+                    backup_file "$PC_GD_PATH/$file"
+                    adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/"
+                else
+                    if [ -f "$PC_GD_PATH/$file" ]; then
+                        PC_TIME=$(stat -c %Y "$PC_GD_PATH/$file" 2>/dev/null || echo 0)
+                        PHONE_TIME=$(adb shell "stat -c %Y $PHONE_GD_PATH/$file" 2>/dev/null || echo 0)
+                        
+                        if [ $PHONE_TIME -gt $PC_TIME ]; then
+                            show_status_notification "Pulling newer file: $file"
+                            backup_file "$PC_GD_PATH/$file"
+                            adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/"
+                        else
+                            show_status_notification "Skipping $file (not modified)"
+                        fi
+                    else
+                        show_status_notification "Pulling new file: $file"
+                        backup_file "$PC_GD_PATH/$file"
+                        adb pull "$PHONE_GD_PATH/$file" "$PC_GD_PATH/"
+                    fi
+                fi
             fi
         done
     else
         FILES=$(adb shell "find $PHONE_GD_PATH -maxdepth 1 -type f")
         while IFS= read -r file; do
-            fname=$(basename "$file")
-            backup_file "$PC_GD_PATH/$fname"
-            adb pull "$file" "$PC_GD_PATH/"
+            if [ -n "$file" ]; then
+                fname=$(basename "$file")
+                
+                if is_critical_file "$fname" || [ "$SMART_SYNC" = false ]; then
+                    show_status_notification "Pulling: $fname"
+                    backup_file "$PC_GD_PATH/$fname"
+                    adb pull "$file" "$PC_GD_PATH/"
+                else
+                    if [ -f "$PC_GD_PATH/$fname" ]; then
+                        PC_TIME=$(stat -c %Y "$PC_GD_PATH/$fname" 2>/dev/null || echo 0)
+                        PHONE_TIME=$(adb shell "stat -c %Y $file" 2>/dev/null || echo 0)
+                        
+                        if [ $PHONE_TIME -gt $PC_TIME ]; then
+                            show_status_notification "Pulling newer file: $fname"
+                            backup_file "$PC_GD_PATH/$fname"
+                            adb pull "$file" "$PC_GD_PATH/"
+                        else
+                            show_status_notification "Skipping $fname (not modified)"
+                        fi
+                    else
+                        show_status_notification "Pulling new file: $fname"
+                        backup_file "$PC_GD_PATH/$fname"
+                        adb pull "$file" "$PC_GD_PATH/"
+                    fi
+                fi
+            fi
         done <<< "$FILES"
     fi
 
-    zenity --info --title="Success" --text="Files pulled from phone!"
-    show_donation_prompt
+    if [ "$BACKGROUND_SYNC" = false ]; then
+        zenity --info --title="Success" --text="Files pulled from phone!"
+        show_donation_prompt
+    else
+        notify-send "GDSync" "Files pulled from phone successfully!"
+    fi
+}
+
+sync_geode_mods() {
+    if ! [ "$PRO_ENABLED" = true ]; then
+        zenity --error --title="Pro Feature" --text="This is a Pro feature. Please activate Pro to use it."
+        return
+    fi
+
+    DIRECTION=$(zenity --list --radiolist \
+        --title="Geode Mods Sync" \
+        --text="Choose sync direction:" \
+        --column="Select" --column="Direction" \
+        TRUE "Push (PC → Phone)" \
+        FALSE "Pull (Phone → PC)")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
+    
+    USE_SMART_SYNC=$(zenity --question --title="Sync Method" \
+        --text="Use Smart Sync (only new/updated files)?" \
+        --ok-label="Yes" --cancel-label="No")
+    SMART_SYNC=$?
+    
+    if [ $? -eq 255 ]; then
+        exit 0
+    fi
+
+    BACKGROUND_SYNC=$(zenity --question --title="Background Sync" \
+        --text="Run sync in background?" \
+        --ok-label="Yes" --cancel-label="No")
+    BACKGROUND_SYNC=$?
+    
+    if [ $? -eq 255 ]; then
+        exit 0
+    fi
+
+    if [ $BACKGROUND_SYNC -eq 0 ]; then
+        {
+            if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+                sync_geode_mods_push $SMART_SYNC
+            else
+                sync_geode_mods_pull $SMART_SYNC
+            fi
+        } &
+        
+        zenity --notification --text="GDSync is syncing Geode mods in the background" --timeout=5
+    else
+        if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+            sync_geode_mods_push $SMART_SYNC
+        else
+            sync_geode_mods_pull $SMART_SYNC
+        fi
+    fi
+}
+
+sync_geode_mods_push() {
+    SMART_SYNC=$1
+    
+    adb shell "mkdir -p $PHONE_GEODE_PATH"
+    
+    for mod in "$PC_GEODE_PATH"/*.geode; do
+        if [ -f "$mod" ]; then
+            mod_name=$(basename "$mod")
+            
+            if [ $SMART_SYNC -eq 0 ]; then
+                if adb shell "[ -f $PHONE_GEODE_PATH/$mod_name ]"; then
+                    PC_TIME=$(stat -c %Y "$mod")
+                    PHONE_TIME=$(adb shell "stat -c %Y $PHONE_GEODE_PATH/$mod_name" 2>/dev/null || echo 0)
+                    
+                    if [ $PC_TIME -gt $PHONE_TIME ]; then
+                        show_status_notification "Pushing newer mod: $mod_name"
+                        adb push "$mod" "$PHONE_GEODE_PATH/"
+                    else
+                        show_status_notification "Skipping $mod_name (not modified)"
+                    fi
+                else
+                    show_status_notification "Pushing new mod: $mod_name"
+                    adb push "$mod" "$PHONE_GEODE_PATH/"
+                fi
+            else
+                show_status_notification "Pushing mod: $mod_name"
+                adb push "$mod" "$PHONE_GEODE_PATH/"
+            fi
+        fi
+    done
+    
+    notify-send "GDSync" "Geode mods pushed to phone successfully!"
+}
+
+sync_geode_mods_pull() {
+    SMART_SYNC=$1
+    
+    mkdir -p "$PC_GEODE_PATH"
+    
+    MOD_FILES=$(adb shell "find $PHONE_GEODE_PATH -maxdepth 1 -name '*.geode'")
+    
+    while IFS= read -r mod; do
+        if [ -n "$mod" ]; then
+            mod_name=$(basename "$mod")
+            
+            if [ $SMART_SYNC -eq 0 ] && [ -f "$PC_GEODE_PATH/$mod_name" ]; then
+                PC_TIME=$(stat -c %Y "$PC_GEODE_PATH/$mod_name" 2>/dev/null || echo 0)
+                PHONE_TIME=$(adb shell "stat -c %Y $mod" 2>/dev/null || echo 0)
+                
+                if [ $PHONE_TIME -gt $PC_TIME ]; then
+                    show_status_notification "Pulling newer mod: $mod_name"
+                    adb pull "$mod" "$PC_GEODE_PATH/"
+                else
+                    show_status_notification "Skipping $mod_name (not modified)"
+                fi
+            else
+                show_status_notification "Pulling mod: $mod_name"
+                adb pull "$mod" "$PC_GEODE_PATH/"
+            fi
+        fi
+    done <<< "$MOD_FILES"
+    
+    notify-send "GDSync" "Geode mods pulled from phone successfully!"
+}
+
+sync_gdh_replays() {
+    if ! [ "$PRO_ENABLED" = true ]; then
+        zenity --error --title="Pro Feature" --text="This is a Pro feature. Please activate Pro to use it."
+        return
+    fi
+
+    DIRECTION=$(zenity --list --radiolist \
+        --title="GDH Replays Sync" \
+        --text="Choose sync direction:" \
+        --column="Select" --column="Direction" \
+        TRUE "Push (PC → Phone)" \
+        FALSE "Pull (Phone → PC)")
+    
+    if [ $? -ne 0 ]; then
+        exit 0
+    fi
+    
+    USE_SMART_SYNC=$(zenity --question --title="Sync Method" \
+        --text="Use Smart Sync (only new/updated files)?" \
+        --ok-label="Yes" --cancel-label="No")
+    SMART_SYNC=$?
+    
+    if [ $? -eq 255 ]; then
+        exit 0
+    fi
+
+    BACKGROUND_SYNC=$(zenity --question --title="Background Sync" \
+        --text="Run sync in background?" \
+        --ok-label="Yes" --cancel-label="No")
+    BACKGROUND_SYNC=$?
+    
+    if [ $? -eq 255 ]; then
+        exit 0
+    fi
+
+    if [ $BACKGROUND_SYNC -eq 0 ]; then
+        {
+            if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+                sync_gdh_replays_push $SMART_SYNC
+            else
+                sync_gdh_replays_pull $SMART_SYNC
+            fi
+        } &
+        
+        zenity --notification --text="GDSync is syncing GDH replays in the background" --timeout=5
+    else
+        if [ "$DIRECTION" == "Push (PC → Phone)" ]; then
+            sync_gdh_replays_push $SMART_SYNC
+        else
+            sync_gdh_replays_pull $SMART_SYNC
+        fi
+    fi
+}
+
+sync_gdh_replays_push() {
+    SMART_SYNC=$1
+    
+    adb shell "mkdir -p $PHONE_GDH_PATH"
+    
+    for replay in "$PC_GDH_PATH"/*.macro; do
+        if [ -f "$replay" ]; then
+            replay_name=$(basename "$replay")
+            
+            if [ $SMART_SYNC -eq 0 ]; then
+                if adb shell "[ -f $PHONE_GDH_PATH/$replay_name ]"; then
+                    PC_TIME=$(stat -c %Y "$replay")
+                    PHONE_TIME=$(adb shell "stat -c %Y $PHONE_GDH_PATH/$replay_name" 2>/dev/null || echo 0)
+                    
+                    if [ $PC_TIME -gt $PHONE_TIME ]; then
+                        show_status_notification "Pushing newer replay: $replay_name"
+                        adb push "$replay" "$PHONE_GDH_PATH/"
+                    else
+                        show_status_notification "Skipping $replay_name (not modified)"
+                    fi
+                else
+                    show_status_notification "Pushing new replay: $replay_name"
+                    adb push "$replay" "$PHONE_GDH_PATH/"
+                fi
+            else
+                show_status_notification "Pushing replay: $replay_name"
+                adb push "$replay" "$PHONE_GDH_PATH/"
+            fi
+        fi
+    done
+    
+    notify-send "GDSync" "GDH replays pushed to phone successfully!"
+}
+
+sync_gdh_replays_pull() {
+    SMART_SYNC=$1
+    
+    mkdir -p "$PC_GDH_PATH"
+    
+    REPLAY_FILES=$(adb shell "find $PHONE_GDH_PATH -maxdepth 1 -name '*.macro'")
+    
+    while IFS= read -r replay; do
+        if [ -n "$replay" ]; then
+            replay_name=$(basename "$replay")
+            
+            if [ $SMART_SYNC -eq 0 ] && [ -f "$PC_GDH_PATH/$replay_name" ]; then
+                PC_TIME=$(stat -c %Y "$PC_GDH_PATH/$replay_name" 2>/dev/null || echo 0)
+                PHONE_TIME=$(adb shell "stat -c %Y $replay" 2>/dev/null || echo 0)
+                
+                if [ $PHONE_TIME -gt $PC_TIME ]; then
+                    show_status_notification "Pulling newer replay: $replay_name"
+                    adb pull "$replay" "$PC_GDH_PATH/"
+                else
+                    show_status_notification "Skipping $replay_name (not modified)"
+                fi
+            else
+                show_status_notification "Pulling replay: $replay_name"
+                adb pull "$replay" "$PC_GDH_PATH/"
+            fi
+        fi
+    done <<< "$REPLAY_FILES"
+    
+    notify-send "GDSync" "GDH replays pulled from phone successfully!"
 }
 
 show_donation_prompt() {
@@ -164,7 +740,17 @@ show_donation_prompt() {
         --text="Like GDSync?\n\nConsider donating to MalikHw47!" \
         --ok-label="Donate" --cancel-label="Later"; then
         open_donation
+    else
+        exit 0
     fi
 }
+
+if [ "$PRO_ENABLED" = false ]; then
+    if zenity --question --title="GDSync Pro" \
+        --text="Welcome to GDSync!\n\nActivate Pro features for enhanced sync capabilities?\n\n- Sync Geode mods\n- Smart sync (only new files)\n- Background syncing\n- Sync GDH replays" \
+        --ok-label="Activate Pro" --cancel-label="Continue with Free"; then
+        activate_pro
+    fi
+fi
 
 main_menu
