@@ -24,7 +24,7 @@ then follow [THIS SHIT VIDEO](https://www.youtube.com/watch?v=bIWe8RYs-dI)
 ### UI:
 ![UI:](gdsync.png)
 
-## [Video](https://youtu.be/-bHdFm5wCOg)
+## [Video](https://youtube.com/shorts/yiu1b-tfhow?si=ZwgrMbMPuXbXVQtV)
 
 
 ## Features
