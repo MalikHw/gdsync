@@ -3,11 +3,15 @@
 GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, etc.) between your Android device and your PC. With GD Sync, you can easily transfer your Geometry Dash data back and forth, ensuring that your progress is always up-to-date on both platforms.
 
 
-## Dependcies (if the deb file wont install):
-```
-sudo apt update
-sudo apt install adb libxcb-cursor0 python3 python3-pyqt6 -y
-```
+## Dependcies
+### Debian:
+
+`sudo apt install adb`
+
+### Windows:
+
+https://secyukle.com/dosya/uploads/adb/adb-installer/adbdriver.zip
+(pls install from here)
 
 ## Screenshots
 
