@@ -10,7 +10,7 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 
 ### Windows:
 
-https://secyukle.com/dosya/uploads/adb/adb-installer/adbdriver.zip
+[ADB INSTALLER BY fawazahmed0](https://github.com/fawazahmed0/Latest-adb-fastboot-installer-for-windows/releases/latest/download/Latest-ADB-Installer.bat)
 (pls install from here)
 
 ## Screenshots
