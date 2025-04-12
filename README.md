@@ -6,9 +6,13 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 ## Dependcies
 ### Debian:
 
+**Python isnt required at all since its bundled inside the app itself**
+
 `sudo apt install adb`
 
 ### Windows:
+
+**Python isnt required at all since its bundled inside the app itself**
 
 [ADB TOOLS](https://dl.google.com/android/repository/platform-tools-latest-windows.zip)
 (pls install from here)
