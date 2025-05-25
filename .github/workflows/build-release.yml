@@ -1,0 +1,453 @@
+name: Build and Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller
+    
+    - name: Create dummy banner
+      run: |
+        mkdir -p resources
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+img = Image.new('RGB', (580, 120), color='#2196F3')
+draw = ImageDraw.Draw(img)
+try:
+    font = ImageFont.truetype('arial.ttf', 32)
+except:
+    font = ImageFont.load_default()
+text = f'gdsync {os.environ.get(\"GITHUB_REF_NAME\", \"v3.0\")}'
+bbox = draw.textbbox((0, 0), text, font=font)
+text_width = bbox[2] - bbox[0]
+text_height = bbox[3] - bbox[1]
+x = (580 - text_width) // 2
+y = (120 - text_height) // 2
+draw.text((x, y), text, fill='white', font=font)
+img.save('resources/banner.png')
+        "
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller gdsync.spec --clean --noconfirm
+    
+    - name: Create Windows archive
+      run: |
+        cd dist
+        7z a -tzip gdsync-windows-${{ github.ref_name }}.zip gdsync/
+    
+    - name: Upload Windows build
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: dist/gdsync-windows-${{ github.ref_name }}.zip
+        asset_name: gdsync-windows-${{ github.ref_name }}.zip
+        asset_content_type: application/zip
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller pillow
+    
+    - name: Create dummy banner
+      run: |
+        mkdir -p resources
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+img = Image.new('RGB', (580, 120), color='#2196F3')
+draw = ImageDraw.Draw(img)
+font = ImageFont.load_default()
+text = f'gdsync {os.environ.get(\"GITHUB_REF_NAME\", \"v3.0\")}'
+bbox = draw.textbbox((0, 0), text, font=font)
+text_width = bbox[2] - bbox[0]
+text_height = bbox[3] - bbox[1]
+x = (580 - text_width) // 2
+y = (120 - text_height) // 2
+draw.text((x, y), text, fill='white', font=font)
+img.save('resources/banner.png')
+        "
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller gdsync.spec --clean --noconfirm
+    
+    - name: Create DMG
+      run: |
+        # Install create-dmg
+        brew install create-dmg
+        
+        # Create DMG
+        create-dmg \
+          --volname "gdsync" \
+          --volicon "icon.png" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --icon "gdsync.app" 200 190 \
+          --hide-extension "gdsync.app" \
+          --app-drop-link 600 185 \
+          "gdsync-macos-${{ github.ref_name }}.dmg" \
+          "dist/gdsync.app"
+    
+    - name: Upload macOS build
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: gdsync-macos-${{ github.ref_name }}.dmg
+        asset_name: gdsync-macos-${{ github.ref_name }}.dmg
+        asset_content_type: application/x-apple-diskimage
+
+  build-ubuntu-deb:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3-pyqt6 python3-pip alien fakeroot
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller pillow
+    
+    - name: Create dummy banner
+      run: |
+        mkdir -p resources
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+img = Image.new('RGB', (580, 120), color='#2196F3')
+draw = ImageDraw.Draw(img)
+font = ImageFont.load_default()
+text = f'gdsync {os.environ.get(\"GITHUB_REF_NAME\", \"v3.0\")}'
+bbox = draw.textbbox((0, 0), text, font=font)
+text_width = bbox[2] - bbox[0]
+text_height = bbox[3] - bbox[1]
+x = (580 - text_width) // 2
+y = (120 - text_height) // 2
+draw.text((x, y), text, fill='white', font=font)
+img.save('resources/banner.png')
+        "
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller gdsync.spec --clean --noconfirm
+    
+    - name: Create DEB package structure
+      run: |
+        mkdir -p deb-package/DEBIAN
+        mkdir -p deb-package/opt/gdsync
+        mkdir -p deb-package/usr/share/applications
+        mkdir -p deb-package/usr/share/pixmaps
+        
+        # Copy files
+        cp -r dist/gdsync/* deb-package/opt/gdsync/
+        cp icon.png deb-package/usr/share/pixmaps/gdsync.png
+        
+        # Create desktop file
+        cat > deb-package/usr/share/applications/gdsync.desktop << EOF
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=gdsync
+        Comment=Geometry Dash save file synchronization tool
+        Exec=/opt/gdsync/gdsync
+        Icon=gdsync
+        Terminal=false
+        Categories=Utility;
+        EOF
+        
+        # Create control file
+        cat > deb-package/DEBIAN/control << EOF
+        Package: gdsync
+        Version: ${{ github.ref_name }}
+        Section: utils
+        Priority: optional
+        Architecture: amd64
+        Depends: python3, python3-pyqt6
+        Maintainer: MalikHw47
+        Description: Geometry Dash save file synchronization tool
+         A tool to synchronize Geometry Dash save files between PC and Android devices.
+        EOF
+        
+        # Set permissions
+        chmod 755 deb-package/opt/gdsync/gdsync
+        chmod 644 deb-package/usr/share/applications/gdsync.desktop
+    
+    - name: Build DEB package
+      run: |
+        dpkg-deb --build deb-package gdsync-ubuntu-${{ github.ref_name }}.deb
+    
+    - name: Upload Ubuntu DEB
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: gdsync-ubuntu-${{ github.ref_name }}.deb
+        asset_name: gdsync-ubuntu-${{ github.ref_name }}.deb
+        asset_content_type: application/vnd.debian.binary-package
+
+  build-arch:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller pillow
+    
+    - name: Create dummy banner
+      run: |
+        mkdir -p resources
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+img = Image.new('RGB', (580, 120), color='#2196F3')
+draw = ImageDraw.Draw(img)
+font = ImageFont.load_default()
+text = f'gdsync {os.environ.get(\"GITHUB_REF_NAME\", \"v3.0\")}'
+bbox = draw.textbbox((0, 0), text, font=font)
+text_width = bbox[2] - bbox[0]
+text_height = bbox[3] - bbox[1]
+x = (580 - text_width) // 2
+y = (120 - text_height) // 2
+draw.text((x, y), text, fill='white', font=font)
+img.save('resources/banner.png')
+        "
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller gdsync.spec --clean --noconfirm
+    
+    - name: Create Arch package structure
+      run: |
+        mkdir -p arch-package
+        cd arch-package
+        
+        # Create PKGBUILD
+        cat > PKGBUILD << EOF
+        pkgname=gdsync
+        pkgver=${{ github.ref_name }}
+        pkgrel=1
+        pkgdesc="Geometry Dash save file synchronization tool"
+        arch=('x86_64')
+        url="https://github.com/MalikHw/gdsync"
+        license=('MIT')
+        depends=('python' 'python-pyqt6')
+        source=()
+        sha256sums=()
+        
+        package() {
+            install -dm755 "\$pkgdir/opt/gdsync"
+            install -dm755 "\$pkgdir/usr/share/applications"
+            install -dm755 "\$pkgdir/usr/share/pixmaps"
+            install -dm755 "\$pkgdir/usr/bin"
+            
+            cp -r ../dist/gdsync/* "\$pkgdir/opt/gdsync/"
+            
+            install -Dm644 ../icon.png "\$pkgdir/usr/share/pixmaps/gdsync.png"
+            
+            cat > "\$pkgdir/usr/share/applications/gdsync.desktop" << EOFDESKTOP
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=gdsync
+        Comment=Geometry Dash save file synchronization tool
+        Exec=/opt/gdsync/gdsync
+        Icon=gdsync
+        Terminal=false
+        Categories=Utility;
+        EOFDESKTOP
+            
+            # Create symlink in /usr/bin
+            ln -s /opt/gdsync/gdsync "\$pkgdir/usr/bin/gdsync"
+        }
+        EOF
+        
+        # Install fakeroot and create package
+        sudo apt-get update && sudo apt-get install -y fakeroot
+        
+        # Create a simple tar.xz package (since we can't actually build with makepkg on Ubuntu)
+        mkdir -p pkg/opt/gdsync
+        mkdir -p pkg/usr/share/applications
+        mkdir -p pkg/usr/share/pixmaps
+        mkdir -p pkg/usr/bin
+        
+        cp -r ../dist/gdsync/* pkg/opt/gdsync/
+        cp ../icon.png pkg/usr/share/pixmaps/gdsync.png
+        
+        cat > pkg/usr/share/applications/gdsync.desktop << EOFDESKTOP
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=gdsync
+        Comment=Geometry Dash save file synchronization tool
+        Exec=/opt/gdsync/gdsync
+        Icon=gdsync
+        Terminal=false
+        Categories=Utility;
+        EOFDESKTOP
+        
+        cd pkg && ln -s /opt/gdsync/gdsync usr/bin/gdsync
+        cd ..
+        
+        tar -cJf gdsync-arch-${{ github.ref_name }}.pkg.tar.xz -C pkg .
+    
+    - name: Upload Arch package
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: arch-package/gdsync-arch-${{ github.ref_name }}.pkg.tar.xz
+        asset_name: gdsync-arch-${{ github.ref_name }}.pkg.tar.xz
+        asset_content_type: application/x-xz
+
+  build-appimage:
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller pillow
+        sudo apt-get update
+        sudo apt-get install -y fuse libfuse2
+    
+    - name: Create dummy banner
+      run: |
+        mkdir -p resources
+        python -c "
+from PIL import Image, ImageDraw, ImageFont
+import os
+img = Image.new('RGB', (580, 120), color='#2196F3')
+draw = ImageDraw.Draw(img)
+font = ImageFont.load_default()
+text = f'gdsync {os.environ.get(\"GITHUB_REF_NAME\", \"v3.0\")}'
+bbox = draw.textbbox((0, 0), text, font=font)
+text_width = bbox[2] - bbox[0]
+text_height = bbox[3] - bbox[1]
+x = (580 - text_width) // 2
+y = (120 - text_height) // 2
+draw.text((x, y), text, fill='white', font=font)
+img.save('resources/banner.png')
+        "
+      env:
+        GITHUB_REF_NAME: ${{ github.ref_name }}
+    
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller gdsync.spec --clean --noconfirm
+    
+    - name: Download AppImageTool
+      run: |
+        wget https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+        chmod +x appimagetool-x86_64.AppImage
+    
+    - name: Create AppImage structure
+      run: |
+        mkdir -p appimage-build/usr/bin
+        mkdir -p appimage-build/usr/share/applications
+        mkdir -p appimage-build/usr/share/pixmaps
+        
+        # Copy built application
+        cp -r dist/gdsync/* appimage-build/usr/bin/
+        
+        # Create wrapper script
+        cat > appimage-build/AppRun << EOF
+        #!/bin/bash
+        cd "\$(dirname "\$0")/usr/bin"
+        exec ./gdsync "\$@"
+        EOF
+        chmod +x appimage-build/AppRun
+        
+        # Copy icon
+        cp icon.png appimage-build/usr/share/pixmaps/gdsync.png
+        cp icon.png appimage-build/gdsync.png
+        
+        # Create desktop file
+        cat > appimage-build/gdsync.desktop << EOF
+        [Desktop Entry]
+        Version=1.0
+        Type=Application
+        Name=gdsync
+        Comment=Geometry Dash save file synchronization tool
+        Exec=gdsync
+        Icon=gdsync
+        Terminal=false
+        Categories=Utility;
+        EOF
+        
+        cp appimage-build/gdsync.desktop appimage-build/usr/share/applications/
+    
+    - name: Build AppImage
+      run: |
+        ./appimagetool-x86_64.AppImage appimage-build gdsync-${{ github.ref_name }}.AppImage
+    
+    - name: Upload AppImage
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: gdsync-${{ github.ref_name }}.AppImage
+        asset_name: gdsync-${{ github.ref_name }}.AppImage
+        asset_content_type: application/x-executable
