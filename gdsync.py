@@ -9,7 +9,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                             QHBoxLayout, QPushButton, QRadioButton, QButtonGroup,
                             QLabel, QTextEdit, QFileDialog, QMessageBox, QProgressBar)
 from PyQt6.QtCore import Qt, QProcess, QThread, pyqtSignal
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon, QPixmap, QFont
 
 class SyncWorker(QThread):
     """Worker thread for sync operations to prevent UI freezing"""
@@ -33,7 +33,7 @@ class SyncWorker(QThread):
 class GDSync(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("gdsync v3.0 by MalikHw47")
+        self.setWindowTitle("gdsync v3.1 by MalikHw47")
         self.setFixedSize(600, 450)
         self.process = None
         self.adb_path = ""
@@ -46,23 +46,28 @@ class GDSync(QMainWindow):
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
         
-        # Banner section
-        banner_layout = QVBoxLayout()
-        self.banner_label = QLabel()
+        # Title section (replacing banner)
+        title_layout = QVBoxLayout()
+        self.title_label = QLabel("GDSync V3.1 by MalikHw47")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
-        # Try to load banner image
-        banner_path = os.path.join(self.get_resource_path(), "resources", "banner.png")
-        if os.path.exists(banner_path):
-            pixmap = QPixmap(banner_path)
-            self.banner_label.setPixmap(pixmap.scaledToWidth(580))
-            self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        else:
-            self.banner_label.setText("Banner Image Not Found")
-            self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.banner_label.setStyleSheet("background-color: #f0f0f0; padding: 10px;")
+        # Style the title
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        self.title_label.setStyleSheet("""
+            QLabel {
+                background-color: #2c3e50;
+                color: white;
+                padding: 20px;
+                border-radius: 10px;
+                margin: 10px;
+            }
+        """)
         
-        banner_layout.addWidget(self.banner_label)
-        main_layout.addLayout(banner_layout)
+        title_layout.addWidget(self.title_label)
+        main_layout.addLayout(title_layout)
         
         # Logs section
         logs_layout = QVBoxLayout()
@@ -99,7 +104,7 @@ class GDSync(QMainWindow):
         
         # Data options
         data_layout = QHBoxLayout()
-        self.only_userdata = QRadioButton("Only userdat")
+        self.only_userdata = QRadioButton("Only userdata")
         self.all_data = QRadioButton("All data with Songs and SFX")
         self.only_userdata.setChecked(True)
         
@@ -157,26 +162,30 @@ class GDSync(QMainWindow):
         QApplication.processEvents()  # Process UI events to update progress bar immediately
     
     def detect_linux_distro(self):
-        """Detect Linux distribution"""
+        """Detect Linux distribution and return package manager"""
         try:
             # Try to read /etc/os-release
             if os.path.exists("/etc/os-release"):
                 with open("/etc/os-release", "r") as f:
                     content = f.read().lower()
-                    if "ubuntu" in content or "debian" in content:
+                    if "ubuntu" in content or "debian" in content or "mint" in content:
                         return "apt"
                     elif "fedora" in content or "rhel" in content or "centos" in content:
                         return "dnf"
-                    elif "arch" in content or "manjaro" in content:
+                    elif "arch" in content or "manjaro" in content or "endeavouros" in content:
                         return "pacman"
+                    elif "opensuse" in content or "suse" in content:
+                        return "zypper"
             
-            # Fallback checks
-            if os.path.exists("/usr/bin/apt"):
+            # Fallback checks for package managers
+            if os.path.exists("/usr/bin/apt") or os.path.exists("/usr/bin/apt-get"):
                 return "apt"
             elif os.path.exists("/usr/bin/dnf"):
                 return "dnf"
             elif os.path.exists("/usr/bin/pacman"):
                 return "pacman"
+            elif os.path.exists("/usr/bin/zypper"):
+                return "zypper"
             elif os.path.exists("/usr/bin/yum"):
                 return "yum"
         except Exception as e:
@@ -184,40 +193,104 @@ class GDSync(QMainWindow):
         
         return None
     
+    def show_windows_adb_tutorial(self):
+        """Show ADB installation tutorial for Windows"""
+        tutorial_text = """
+ADB Installation Tutorial for Windows:
+
+1. Download Android SDK Platform Tools:
+   - Go to: https://developer.android.com/studio/releases/platform-tools
+   - Download "SDK Platform-Tools for Windows"
+
+2. Extract the downloaded ZIP file to a folder (e.g., C:\\platform-tools)
+
+3. Add ADB to System Environment Variables:
+   - Right-click "This PC" → Properties
+   - Click "Advanced system settings"
+   - Click "Environment Variables"
+   - Under "System Variables", find and select "Path"
+   - Click "Edit" → "New"
+   - Add the path where you extracted platform-tools (e.g., C:\\platform-tools)
+   - Click OK on all windows
+
+4. Restart this application after installation
+
+5. Enable USB Debugging on your Android device:
+   - Go to Settings → About Phone
+   - Tap "Build Number" 7 times to enable Developer Options
+   - Go to Settings → Developer Options
+   - Enable "USB Debugging"
+        """
+        
+        QMessageBox.information(self, "ADB Installation Tutorial", tutorial_text)
+
     def install_adb_linux(self):
         """Install ADB on Linux based on detected distribution"""
         distro = self.detect_linux_distro()
         
         if not distro:
             self.log("Could not detect Linux distribution. Please install ADB manually.")
+            QMessageBox.information(
+                self,
+                "Manual Installation Required",
+                "Could not detect your Linux distribution.\n\n"
+                "Please install ADB manually using your distribution's package manager:\n"
+                "- Most distributions have 'android-tools-adb' or 'android-tools' package\n"
+                "- After installation, restart this application"
+            )
             return False
         
         commands = {
-            "apt": ["sudo", "apt", "update", "&&", "sudo", "apt", "install", "-y", "android-tools-adb"],
-            "dnf": ["sudo", "dnf", "install", "-y", "android-tools"],
-            "pacman": ["sudo", "pacman", "-S", "--noconfirm", "android-tools"],
-            "yum": ["sudo", "yum", "install", "-y", "android-tools"]
+            "apt": "sudo apt update && sudo apt install -y android-tools-adb",
+            "dnf": "sudo dnf install -y android-tools",
+            "pacman": "sudo pacman -S --noconfirm android-tools",
+            "zypper": "sudo zypper install -y android-tools",  # OpenSUSE
+            "yum": "sudo yum install -y android-tools"
         }
         
         if distro in commands:
-            self.log(f"Detected {distro}-based system. Installing ADB...")
+            distro_names = {
+                "apt": "Ubuntu/Debian",
+                "dnf": "Fedora",
+                "pacman": "Arch Linux",
+                "zypper": "OpenSUSE",
+                "yum": "CentOS/RHEL"
+            }
+            
+            self.log(f"Detected {distro_names.get(distro, distro)}-based system. Installing ADB...")
             try:
-                # Use shell=True for commands with &&
-                if distro == "apt":
-                    subprocess.run("sudo apt update && sudo apt install -y android-tools-adb", 
-                                 shell=True, check=True)
-                else:
-                    subprocess.run(commands[distro], check=True)
+                subprocess.run(commands[distro], shell=True, check=True)
                 
                 self.log("ADB installation completed successfully!")
+                QMessageBox.information(
+                    self,
+                    "Installation Complete",
+                    "ADB has been installed successfully!\n\n"
+                    "Please restart this application to use ADB functionality."
+                )
                 # Re-detect ADB after installation
                 self.detect_adb()
                 return True
             except subprocess.CalledProcessError as e:
                 self.log(f"Failed to install ADB: {str(e)}")
+                QMessageBox.critical(
+                    self,
+                    "Installation Failed",
+                    f"Failed to install ADB automatically.\n\n"
+                    f"Error: {str(e)}\n\n"
+                    "Please install ADB manually using:\n"
+                    f"{commands[distro]}"
+                )
                 return False
         else:
             self.log(f"Unsupported package manager: {distro}")
+            QMessageBox.information(
+                self,
+                "Manual Installation Required",
+                f"Detected package manager: {distro}\n\n"
+                "Please install ADB manually using your distribution's package manager.\n"
+                "After installation, restart this application."
+            )
             return False
     
     def detect_adb(self):
@@ -242,21 +315,38 @@ class GDSync(QMainWindow):
             
             if self.adb_path:
                 self.log(f"ADB found in PATH: {self.adb_path}")
-            else:
-                self.log("ADB not found in PATH.")
-                if platform.system() == "Linux":
-                    reply = QMessageBox.question(
-                        self, 
-                        "ADB Not Found", 
-                        "ADB is not installed. Would you like to install it automatically?",
-                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-                    )
-                    if reply == QMessageBox.StandardButton.Yes:
-                        self.install_adb_linux()
-                else:
-                    self.log("On Windows, ADB should be bundled with the application.")
+                return
+            
+            # ADB not found, show installation options
+            self.log("ADB not found on system.")
+            self.show_adb_installation_dialog()
+                    
         except Exception as e:
             self.log(f"Error detecting ADB: {str(e)}")
+            self.show_adb_installation_dialog()
+    
+    def show_adb_installation_dialog(self):
+        """Show ADB installation dialog based on OS"""
+        if platform.system() == "Windows":
+            reply = QMessageBox.question(
+                self,
+                "ADB Not Found",
+                "ADB is not installed or not in system PATH.\n\n"
+                "Would you like to see the installation tutorial?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.show_windows_adb_tutorial()
+        else:  # Linux
+            reply = QMessageBox.question(
+                self,
+                "ADB Not Found",
+                "ADB is not installed on your system.\n\n"
+                "Would you like to install it automatically?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.install_adb_linux()
     
     def open_donate(self):
         """Open donation page in web browser"""
@@ -310,18 +400,14 @@ class GDSync(QMainWindow):
         if not os.path.exists(directory):
             return files_to_sync
         
-        for root, dirs, files in os.walk(directory):
-            # Skip excluded directories
-            if self.should_exclude_path(root):
-                continue
-            
-            for file in files:
-                file_path = os.path.join(root, file)
-                relative_path = os.path.relpath(file_path, directory)
-                
-                # Skip excluded files
-                if not self.should_exclude_path(file_path):
-                    files_to_sync.append((file_path, relative_path))
+        # Only get files from the root directory, exclude subfolders
+        try:
+            for item in os.listdir(directory):
+                item_path = os.path.join(directory, item)
+                if os.path.isfile(item_path) and not self.should_exclude_path(item_path):
+                    files_to_sync.append((item_path, item))
+        except Exception as e:
+            self.log(f"Error reading directory {directory}: {str(e)}")
         
         return files_to_sync
     
@@ -362,7 +448,9 @@ class GDSync(QMainWindow):
             "CCLocalLevels.dat", 
             "CCLocalLevels2.dat", 
             "CCGameManager.dat",
-            "CCGameManager2.dat"
+            "CCGameManager2.dat",
+            "sfxlibrary.dat",
+            "musiclibrary.dat"
         ]
         
         success = True
@@ -384,7 +472,9 @@ class GDSync(QMainWindow):
             "CCLocalLevels.dat", 
             "CCLocalLevels2.dat", 
             "CCGameManager.dat",
-            "CCGameManager2.dat"
+            "CCGameManager2.dat",
+            "sfxlibrary.dat",
+            "musiclibrary.dat"
         ]
         
         success = True
@@ -404,12 +494,12 @@ class GDSync(QMainWindow):
         return success
     
     def sync_phone_to_pc_all(self, pc_path, android_path):
-        """Sync all data including songs and SFX from phone to PC"""
+        """Sync all data from phone to PC, file by file"""
         self.log("Syncing all data from phone to PC...")
         
-        # Get list of files (excluding directories)
+        # Get list of files only from the root directory (no subdirectories)
         result = subprocess.run(
-            [self.adb_path, "shell", f"find {android_path} -type f"],
+            [self.adb_path, "shell", f"find {android_path} -maxdepth 1 -type f"],
             capture_output=True,
             text=True
         )
@@ -418,58 +508,53 @@ class GDSync(QMainWindow):
             self.log(f"Error getting file list: {result.stderr}")
             return False
         
-        all_files = result.stdout.strip().split('\n')
+        all_files = [f.strip() for f in result.stdout.strip().split('\n') if f.strip()]
         # Filter out excluded paths
-        files = [f for f in all_files if f.strip() and not self.should_exclude_path(f)]
+        files = [f for f in all_files if not self.should_exclude_path(f)]
         success = True
         
-        self.log(f"Found {len(files)} files to sync")
-        for i, file in enumerate(files):
+        self.log(f"Found {len(files)} files to sync from root directory")
+        for i, file_path in enumerate(files):
             if self.sync_worker:
                 self.sync_worker.progress_updated.emit(i, len(files))
-            file = file.strip()
-            if file:
-                # Create relative path for local storage
-                rel_path = file.replace(android_path, "").lstrip("/")
-                local_dir = os.path.join(pc_path, os.path.dirname(rel_path))
-                os.makedirs(local_dir, exist_ok=True)
-                
-                if not self.run_adb_command(["pull", file, os.path.join(pc_path, rel_path)]):
-                    success = False
+            
+            # Get just the filename for local storage
+            filename = os.path.basename(file_path)
+            local_file_path = os.path.join(pc_path, filename)
+            
+            self.log(f"Pulling file {i+1}/{len(files)}: {filename}")
+            if not self.run_adb_command(["pull", file_path, local_file_path]):
+                success = False
         
         if self.sync_worker:
             self.sync_worker.progress_updated.emit(len(files), len(files))
         return success
     
     def sync_pc_to_phone_all(self, pc_path, android_path):
-        """Sync all data including songs and SFX from PC to phone"""
+        """Sync all data from PC to phone, file by file"""
         self.log("Syncing all data from PC to phone...")
         
         if not os.path.exists(pc_path):
             self.log(f"Error: PC path does not exist: {pc_path}")
             return False
         
-        # Get files to sync (excluding unwanted directories and files)
+        # Get files to sync (only from root directory, excluding subfolders)
         files_to_sync = self.get_files_to_sync(pc_path)
         
         if not files_to_sync:
             self.log("No files found to sync")
             return False
         
-        self.log(f"Found {len(files_to_sync)} files to sync")
+        self.log(f"Found {len(files_to_sync)} files to sync from root directory")
         success = True
         
-        for i, (file_path, relative_path) in enumerate(files_to_sync):
+        for i, (file_path, filename) in enumerate(files_to_sync):
             if self.sync_worker:
                 self.sync_worker.progress_updated.emit(i, len(files_to_sync))
             
-            # Create remote directory structure
-            remote_dir = os.path.dirname(os.path.join(android_path, relative_path).replace("\\", "/"))
-            if remote_dir != android_path:
-                self.run_adb_command(["shell", f"mkdir -p '{remote_dir}'"])
-            
-            # Push the file
-            remote_file_path = os.path.join(android_path, relative_path).replace("\\", "/")
+            # Push the file directly to the android path
+            remote_file_path = f"{android_path}/{filename}"
+            self.log(f"Pushing file {i+1}/{len(files_to_sync)}: {filename}")
             if not self.run_adb_command(["push", file_path, remote_file_path]):
                 success = False
         
