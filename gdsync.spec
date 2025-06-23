@@ -1,4 +1,13 @@
 # -*- mode: python ; coding: utf-8 -*-
+import platform
+
+# Determine icon file based on platform
+if platform.system() == "Windows":
+    icon_file = 'icon.ico'
+elif platform.system() == "Darwin":  # macOS
+    icon_file = 'icon.icns'
+else:  # Linux
+    icon_file = 'icon.png'
 
 a = Analysis(
     ['gdsync.py'],
@@ -42,5 +51,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon='icon.png'
+    icon=icon_file
 )
