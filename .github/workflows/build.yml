@@ -7,68 +7,89 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            python-version: '3.11'
-            name: 'windows'
-            artifact-name: 'GDSync.exe'
-          - os: macos-latest
-            python-version: '3.11'
-            name: 'macos'
-            artifact-name: 'GDSync.dmg'
-          - os: ubuntu-latest
-            python-version: '3.11'
-            name: 'linux'
-            artifact-name: 'GDSync-linux'
-
+  build-windows:
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: '3.11'
 
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install PyQt6 pyinstaller
 
-    - name: Build with PyInstaller (Windows)
-      if: matrix.name == 'windows'
+    - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --icon=icon.png --name=GDSync gdsync.py
+        pyinstaller --onefile --windowed --icon=icon.png --name=gdsync gdsync.py
 
-    - name: Build with PyInstaller (Linux)
-      if: matrix.name == 'linux'
-      run: |
-        pyinstaller --onefile --icon=icon.png --name=GDSync-linux gdsync.py
-
-    - name: Build with PyInstaller (macOS)
-      if: matrix.name == 'macos'
-      run: |
-        pyinstaller --onefile --windowed --icon=icon.png --name=GDSync gdsync.py
-
-    - name: Create DMG (macOS)
-      if: matrix.name == 'macos'
-      run: |
-        mkdir -p dist-dmg
-        cp -r dist/GDSync.app dist-dmg/
-        hdiutil create -volname "GDSync" -srcfolder dist-dmg -ov -format UDZO dist/GDSync.dmg
-
-    - name: Upload artifacts
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.name }}-build
-        path: |
-          dist/${{ matrix.artifact-name }}
+        name: windows-build
+        path: dist/gdsync.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --icon=icon.png --name=gdsync-linux gdsync.py
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-build
+        path: dist/gdsync-linux
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install PyQt6 pyinstaller
+
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --onefile --windowed --icon=icon.png --name=gdsync gdsync.py
+
+    - name: Create DMG
+      run: |
+        mkdir -p dist-dmg
+        cp -r dist/gdsync.app dist-dmg/
+        hdiutil create -volname "GDSync" -srcfolder dist-dmg -ov -format UDZO dist/gdsync.dmg
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-build
+        path: dist/gdsync.dmg
 
   release:
-    needs: build
+    needs: [build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
     
@@ -89,9 +110,9 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./windows-build/GDSync.exe
-          ./macos-build/GDSync.dmg
-          ./linux-build/GDSync-linux
+          ./windows-build/gdsync.exe
+          ./macos-build/gdsync.dmg
+          ./linux-build/gdsync-linux
           ./gdsync.desktop
           ./icon.png
 
@@ -140,7 +161,7 @@ jobs:
         depends=('android-tools')
         provides=('gdsync')
         conflicts=('gdsync')
-        source=("${pkgname}-${pkgver}::${url}/releases/download/v${pkgver}/GDSync-linux"
+        source=("${pkgname}-${pkgver}::${url}/releases/download/v${pkgver}/gdsync-linux"
                 "${pkgname}-${pkgver}.desktop::${url}/releases/download/v${pkgver}/gdsync.desktop"
                 "${pkgname}-${pkgver}.png::${url}/releases/download/v${pkgver}/icon.png")
         sha256sums=('SKIP'
@@ -166,7 +187,7 @@ jobs:
         makepkg --printsrcinfo > .SRCINFO
         
         # Configure Git
-        git config user.name "MalikHw47"
+        git config user.name "malikhw"
         git config user.email "help.malicorporation@gmail.com"
         
         # Commit and push changes
