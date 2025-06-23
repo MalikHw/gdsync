@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=GDSync
+Comment=Sync Geometry Dash save data between PC and Android
+Exec=gdsync
+Icon=gdsync
+Terminal=false
+Type=Application
+Categories=Utility;Game;
+Keywords=sync;android;adb;tools;tool
+StartupNotify=true
