@@ -4,11 +4,16 @@ GD Sync is a tool designed to sync your Geometry Dash data (levels, progress, et
 
 
 ## Dependcies
-### Debian:
+### Debian/Ubuntu
 
-**Python isnt required at all since its bundled inside the app itself**
+```bash
+sudo apt install adb
+```
+### Arch:
 
-`sudo apt install adb`
+```bash
+sudo pacman -S android-tools
+```
 
 ### Windows:
 
@@ -44,9 +49,21 @@ pyinstaller gdsync.spec # will build for windows if ur on windows, will build on
 
 ## Installation
 
-### For Linux via .sh file
+### For Linux via binary file
 
-just go to the *releases* page and get the **.zip** file, and run install.sh
+just go to the *releases* page and get the `gdsync-linux` file, and `chmod +x gdsync-linux`, to run, `./gdsync-linux` or double click
+
+### IF YOU ARE AN ARCH BTW USER!:
+
+its easier for you, just make sure you have an AUR helper like `yay`, then
+```bash
+yay -S gdsync-bin
+```
+and to execute:
+```bash
+gdsync-linux
+```
+or run the shortcut in your Applications
 
 ### For Windows (WILL TEST LATER)
 
