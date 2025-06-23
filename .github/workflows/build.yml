@@ -29,7 +29,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
 
@@ -61,7 +61,7 @@ jobs:
         hdiutil create -volname "GDSync" -srcfolder dist-dmg -ov -format UDZO dist/GDSync.dmg
 
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.name }}-build
         path: |
@@ -76,68 +76,24 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Download all artifacts
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
     
     - name: Create Release
       id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ github.ref }}
-        release_name: Release ${{ github.ref }}
+        name: Release ${{ github.ref }}
         draft: false
         prerelease: false
-
-    - name: Upload Windows Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./windows-build/GDSync.exe
-        asset_name: GDSync.exe
-        asset_content_type: application/octet-stream
-
-    - name: Upload macOS Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./macos-build/GDSync.dmg
-        asset_name: GDSync.dmg
-        asset_content_type: application/octet-stream
-
-    - name: Upload Linux Release Asset
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./linux-build/GDSync-linux
-        asset_name: GDSync-linux
-        asset_content_type: application/octet-stream
-
-    - name: Upload Desktop File
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./gdsync.desktop
-        asset_name: gdsync.desktop
-        asset_content_type: text/plain
-
-    - name: Upload Icon
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./icon.png
-        asset_name: icon.png
-        asset_content_type: image/png
+        files: |
+          ./windows-build/GDSync.exe
+          ./macos-build/GDSync.dmg
+          ./linux-build/GDSync-linux
+          ./gdsync.desktop
+          ./icon.png
 
   update-aur:
     needs: release
@@ -210,7 +166,7 @@ jobs:
         makepkg --printsrcinfo > .SRCINFO
         
         # Configure Git
-        git config user.name "malikhw"
+        git config user.name "MalikHw47"
         git config user.email "help.malicorporation@gmail.com"
         
         # Commit and push changes
