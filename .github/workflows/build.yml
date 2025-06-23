@@ -138,6 +138,8 @@ jobs:
           ./windows-build/gdsync.exe
           ./macos-build/gdsync.dmg
           ./linux-build/gdsync-linux
+          ./gdsync.desktop
+          ./icon.png
 
   update-aur:
     needs: release
