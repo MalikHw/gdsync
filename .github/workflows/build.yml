@@ -210,7 +210,7 @@ jobs:
         makepkg --printsrcinfo > .SRCINFO
         
         # Configure Git
-        git config user.name "MalikHw47"
+        git config user.name "malikhw"
         git config user.email "help.malicorporation@gmail.com"
         
         # Commit and push changes
