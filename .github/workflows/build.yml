@@ -20,11 +20,19 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt6 pyinstaller
+        pip install PyQt6 pyinstaller Pillow
+
+    - name: Convert icon for Windows
+      run: |
+        python -c "
+        from PIL import Image
+        img = Image.open('icon.png')
+        img.save('icon.ico', format='ICO', sizes=[(16,16), (32,32), (48,48), (64,64), (128,128), (256,256)])
+        "
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --icon=icon.png --name=gdsync gdsync.py
+        pyinstaller --onefile --windowed --icon=icon.ico --name=gdsync gdsync.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -45,7 +53,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt6 pyinstaller
+        pip install PyQt6 pyinstaller Pillow
 
     - name: Build with PyInstaller
       run: |
@@ -70,11 +78,35 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt6 pyinstaller
+        pip install PyQt6 pyinstaller Pillow
+
+    - name: Convert icon for macOS
+      run: |
+        python -c "
+        from PIL import Image
+        import os
+        
+        # Create iconset directory
+        os.makedirs('icon.iconset', exist_ok=True)
+        
+        # Load the PNG image
+        img = Image.open('icon.png')
+        
+        # Generate different sizes for iconset
+        sizes = [16, 32, 64, 128, 256, 512, 1024]
+        for size in sizes:
+            resized = img.resize((size, size), Image.Resampling.LANCZOS)
+            resized.save(f'icon.iconset/icon_{size}x{size}.png')
+            if size <= 512:  # Also create @2x versions for smaller sizes
+                resized.save(f'icon.iconset/icon_{size//2}x{size//2}@2x.png')
+        "
+        
+        # Convert iconset to icns
+        iconutil -c icns icon.iconset
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --windowed --icon=icon.png --name=gdsync gdsync.py
+        pyinstaller --onefile --windowed --icon=icon.icns --name=gdsync gdsync.py
 
     - name: Create DMG
       run: |
@@ -137,6 +169,11 @@ jobs:
           IdentityFile ~/.ssh/aur
         EOF
 
+    - name: Install makepkg dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y pacman-package-manager
+
     - name: Clone AUR repository
       run: |
         git clone ssh://aur@aur.archlinux.org/gdsync-bin.git aur-repo
@@ -149,7 +186,7 @@ jobs:
         VERSION=${GITHUB_REF#refs/tags/v}
         
         # Update PKGBUILD
-        cat > PKGBUILD << 'EOF'
+        cat > PKGBUILD << EOF
         # Maintainer: MalikHw47 <help.malicorporation@gmail.com>
         pkgname=gdsync-bin
         pkgver=${VERSION}
@@ -161,29 +198,26 @@ jobs:
         depends=('android-tools')
         provides=('gdsync')
         conflicts=('gdsync')
-        source=("${pkgname}-${pkgver}::${url}/releases/download/v${pkgver}/gdsync-linux"
-                "${pkgname}-${pkgver}.desktop::${url}/releases/download/v${pkgver}/gdsync.desktop"
-                "${pkgname}-${pkgver}.png::${url}/releases/download/v${pkgver}/icon.png")
+        source=("\${pkgname}-\${pkgver}::\${url}/releases/download/v\${pkgver}/gdsync-linux"
+                "\${pkgname}-\${pkgver}.desktop::\${url}/releases/download/v\${pkgver}/gdsync.desktop"
+                "\${pkgname}-\${pkgver}.png::\${url}/releases/download/v\${pkgver}/icon.png")
         sha256sums=('SKIP'
                     'SKIP'
                     'SKIP')
 
         package() {
             # Install the binary
-            install -Dm755 "${srcdir}/${pkgname}-${pkgver}" "${pkgdir}/usr/bin/gdsync"
+            install -Dm755 "\${srcdir}/\${pkgname}-\${pkgver}" "\${pkgdir}/usr/bin/gdsync"
             
             # Install desktop file
-            install -Dm644 "${srcdir}/${pkgname}-${pkgver}.desktop" "${pkgdir}/usr/share/applications/gdsync.desktop"
+            install -Dm644 "\${srcdir}/\${pkgname}-\${pkgver}.desktop" "\${pkgdir}/usr/share/applications/gdsync.desktop"
             
             # Install icon
-            install -Dm644 "${srcdir}/${pkgname}-${pkgver}.png" "${pkgdir}/usr/share/pixmaps/gdsync.png"
+            install -Dm644 "\${srcdir}/\${pkgname}-\${pkgver}.png" "\${pkgdir}/usr/share/pixmaps/gdsync.png"
         }
         EOF
         
-        # Replace VERSION placeholder
-        sed -i "s/\${VERSION}/${VERSION}/g" PKGBUILD
-        
-        # Generate .SRCINFO
+        # Generate .SRCINFO using makepkg
         makepkg --printsrcinfo > .SRCINFO
         
         # Configure Git
