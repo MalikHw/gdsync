@@ -1,350 +1,219 @@
-name: Build Multi-Platform GDSync Releases
-
-permissions:
-  contents: write
-  pull-requests: write
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*'  # Trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allow manual trigger
+      - 'v[0-9]+.[0-9]+*'  # Only version tags like v3.1, v3.2, v3.1.1, etc.
+  workflow_dispatch:
 
 jobs:
-  build-windows:
-    runs-on: windows-latest
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            python-version: '3.11'
+            name: 'windows'
+            artifact-name: 'GDSync.exe'
+          - os: macos-latest
+            python-version: '3.11'
+            name: 'macos'
+            artifact-name: 'GDSync.dmg'
+          - os: ubuntu-latest
+            python-version: '3.11'
+            name: 'linux'
+            artifact-name: 'GDSync-linux'
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Set up Python
+
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
-    
+        python-version: ${{ matrix.python-version }}
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install PyQt6
-        pip install Pillow
-    
-    - name: Convert PNG to ICO for Windows
-      run: |
-        python -c "from PIL import Image; img = Image.open('icon.png'); img.save('icon.ico', format='ICO', sizes=[(256,256), (128,128), (64,64), (32,32), (16,16)])"
-    
-    - name: Build Windows executable
-      run: |
-        pyinstaller --windowed --onefile --icon=icon.ico --add-data="icon.png;." --name=GDSync gdsync.py
-    
-    - name: Upload Windows artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: windows-exe
-        path: dist/GDSync.exe
+        pip install PyQt6 pyinstaller
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
+    - name: Build with PyInstaller (Windows)
+      if: matrix.name == 'windows'
       run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install PyQt6
-    
-    - name: Build macOS application
-      run: |
-        pyinstaller --windowed --onefile --icon=icon.png --add-data="icon.png:." --name=GDSync gdsync.py
-        # Create proper .app bundle
-        mkdir -p GDSync.app/Contents/MacOS
-        mkdir -p GDSync.app/Contents/Resources
-        
-        # Move executable
-        mv dist/GDSync GDSync.app/Contents/MacOS/
-        chmod +x GDSync.app/Contents/MacOS/GDSync
-        
-        # Copy icon
-        cp icon.png GDSync.app/Contents/Resources/icon.png
-        
-        # Create Info.plist
-        cat > GDSync.app/Contents/Info.plist << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>GDSync</string>
-            <key>CFBundleIconFile</key>
-            <string>icon.png</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.malikhw47.gdsync</string>
-            <key>CFBundleName</key>
-            <string>GDSync</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>3.1</string>
-            <key>CFBundleVersion</key>
-            <string>3.1</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>10.15</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-        </dict>
-        </plist>
-        EOF
-    
-    - name: Create DMG
-      run: |
-        # Create a temporary directory for the DMG contents
-        mkdir -p dmg-contents
-        
-        # Copy the .app bundle to the DMG contents
-        cp -R GDSync.app dmg-contents/
-        
-        # Create Applications symlink for easy installation
-        ln -s /Applications dmg-contents/Applications
-        
-        # Create the DMG using hdiutil
-        hdiutil create -volname "GDSync" \
-                       -srcfolder dmg-contents \
-                       -ov \
-                       -format UDZO \
-                       -imagekey zlib-level=9 \
-                       GDSync.dmg
-        
-        # Verify the DMG was created
-        ls -la GDSync.dmg
-    
-    - name: Upload macOS artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-dmg
-        path: GDSync.dmg
+        pyinstaller --onefile --windowed --icon=icon.png --name=GDSync gdsync.py
 
-  build-linux-packages:
-    runs-on: ubuntu-24.04
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install system dependencies and packaging tools
+    - name: Build with PyInstaller (Linux)
+      if: matrix.name == 'linux'
       run: |
-        sudo apt-get update
-        sudo apt-get install -y python3-dev python3-pip build-essential
-        # Install Qt6 dependencies
-        sudo apt-get install -y qt6-base-dev qt6-tools-dev libqt6gui6 libqt6widgets6 libqt6core6
-        sudo apt-get install -y qt6-qpa-plugins libqt6dbus6 libqt6network6 libqt6svg6
-        # Install packaging tools
-        sudo apt-get install -y debhelper dh-python devscripts fakeroot
-        sudo apt-get install -y alien rpm2cpio cpio
-        # Install AppImage tools
-        sudo apt-get install -y zsync desktop-file-utils file
-        # Install ADB tools
-        sudo apt-get install -y android-tools-adb
-    
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pyinstaller
-        pip install PyQt6
-    
-    - name: Build base application
-      run: |
-        pyinstaller --onefile --windowed --icon=icon.png --add-data="icon.png:." --name=GDSync gdsync.py
-        mkdir -p build-assets
-        cp dist/GDSync build-assets/
-        chmod +x build-assets/GDSync
-    
-    # Build .deb package for Debian/Ubuntu
-    - name: Create DEB package structure
-      run: |
-        mkdir -p deb-package/DEBIAN
-        mkdir -p deb-package/usr/bin
-        mkdir -p deb-package/usr/share/applications
-        mkdir -p deb-package/usr/share/pixmaps
-        mkdir -p deb-package/usr/share/doc/gdsync
-        
-        # Copy executable
-        cp build-assets/GDSync deb-package/usr/bin/gdsync
-        
-        # Copy icon
-        cp icon.png deb-package/usr/share/pixmaps/gdsync.png
-        
-        # Create desktop file
-        cat > deb-package/usr/share/applications/gdsync.desktop << 'EOF'
-        [Desktop Entry]
-        Name=GDSync
-        Comment=Geometry Dash Save Data Synchronization Tool
-        Exec=gdsync
-        Icon=gdsync
-        Terminal=false
-        Type=Application
-        Categories=Utility;Game;
-        StartupWMClass=GDSync
-        EOF
-        
-        # Create control file
-        cat > deb-package/DEBIAN/control << 'EOF'
-        Package: gdsync
-        Version: 3.1
-        Section: games
-        Priority: optional
-        Architecture: amd64
-        Depends: libqt6core6, libqt6gui6, libqt6widgets6, python3, android-tools-adb
-        Maintainer: help.malicorporation@gmail.com
-        Description: Geometry Dash Save Data Synchronization Tool
-         A PyQt6-based tool for synchronizing Geometry Dash save data
-         between PC and Android devices using ADB.
-         .
-         Features include:
-          - Bidirectional sync (PC to Phone, Phone to PC)
-          - User data only or complete data sync options
-          - Modern PyQt6 interface
-          - Cross-platform compatibility
-          - ADB integration for Android device communication
-        Homepage: https://github.com/MalikHw47/GDSync
-        EOF
-        
-        # Create copyright file
-        cat > deb-package/usr/share/doc/gdsync/copyright << 'EOF'
-        Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
-        Upstream-Name: GDSync
-        Source: https://github.com/MalikHw47/GDSync
+        pyinstaller --onefile --icon=icon.png --name=GDSync-linux gdsync.py
 
-        Files: *
-        Copyright: 2024 MalikHw47
-        License: MIT
-        EOF
-        
-        # Create changelog
-        cat > deb-package/usr/share/doc/gdsync/changelog << 'EOF'
-        gdsync (3.1) unstable; urgency=medium
-
-          * Release version 3.1
-          * Modern PyQt6 interface
-          * Bidirectional sync support
-          * Cross-platform compatibility
-          * ADB integration improvements
-
-         -- help.malicorporation@gmail.com  $(date -R)
-        EOF
-        
-        gzip deb-package/usr/share/doc/gdsync/changelog
-        
-        # Build DEB package
-        dpkg-deb --build deb-package GDSync.deb
-    
-    # Build Arch Linux package
-    - name: Create Arch Linux package
+    - name: Build with PyInstaller (macOS)
+      if: matrix.name == 'macos'
       run: |
-        mkdir -p arch-package/pkg/usr/bin
-        mkdir -p arch-package/pkg/usr/share/applications
-        
-        # Copy files
-        cp build-assets/GDSync arch-package/pkg/usr/bin/gdsync
-        cp deb-package/usr/share/applications/gdsync.desktop arch-package/pkg/usr/share/applications/
-        cp icon.png arch-package/pkg/usr/share/pixmaps/gdsync.png
-        
-        # Create .PKGINFO
-        cat > arch-package/pkg/.PKGINFO << 'EOF'
-        pkgname = gdsync
-        pkgbase = gdsync
-        pkgver = 3.1-1
-        pkgdesc = Geometry Dash Save Data Synchronization Tool
-        url = https://github.com/MalikHw47/GDSync
-        arch = x86_64
-        license = MIT
-        depend = python
-        depend = qt6-base
-        depend = android-tools
-        depend = python-pyqt6
-        EOF
-        
-        # Create package archive
-        cd arch-package/pkg
-        tar -czf ../../GDSync.pkg.tar.gz .PKGINFO usr/
-    
-    # Build AppImage (without FUSE requirement)
-    - name: Create AppImage
-      run: |
-        # Download appimagetool-x86_64.AppImage
-        wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
-        chmod +x appimagetool-x86_64.AppImage
-        
-        # Create AppDir structure
-        mkdir -p AppDir/usr/bin
-        mkdir -p AppDir/usr/share/applications
-        mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-        
-        # Copy files
-        cp build-assets/GDSync AppDir/usr/bin/
-        cp deb-package/usr/share/applications/gdsync.desktop AppDir/
-        cp icon.png AppDir/usr/share/icons/hicolor/256x256/apps/gdsync.png
-        cp icon.png AppDir/gdsync.png
-        
-        # Create AppRun
-        cat > AppDir/AppRun << 'EOF'
-        #!/bin/bash
-        HERE="$(dirname "$(readlink -f "${0}")")"
-        export PATH="${HERE}/usr/bin:${PATH}"
-        export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH}"
-        exec "${HERE}/usr/bin/GDSync" "$@"
-        EOF
-        chmod +x AppDir/AppRun
-        
-        # Modify desktop file for AppImage
-        sed -i 's/Exec=gdsync/Exec=GDSync/' AppDir/gdsync.desktop
-        
-        # Build AppImage without FUSE
-        ARCH=x86_64 ./appimagetool-x86_64.AppImage --appimage-extract-and-run AppDir GDSync.AppImage
-    
-    - name: Upload DEB package
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-deb
-        path: GDSync.deb
-    
-    - name: Upload Arch package
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-arch
-        path: GDSync.pkg.tar.gz
-    
-    - name: Upload AppImage
-      uses: actions/upload-artifact@v4
-      with:
-        name: linux-appimage
-        path: GDSync.AppImage
+        pyinstaller --onefile --windowed --icon=icon.png --name=GDSync gdsync.py
 
-  create-release:
-    needs: [build-windows, build-macos, build-linux-packages]
+    - name: Create DMG (macOS)
+      if: matrix.name == 'macos'
+      run: |
+        mkdir -p dist-dmg
+        cp -r dist/GDSync.app dist-dmg/
+        hdiutil create -volname "GDSync" -srcfolder dist-dmg -ov -format UDZO dist/GDSync.dmg
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.name }}-build
+        path: |
+          dist/${{ matrix.artifact-name }}
+
+  release:
+    needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
+    
     steps:
+    - uses: actions/checkout@v4
+    
     - name: Download all artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v3
     
     - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          windows-exe/GDSync.exe
-          macos-dmg/GDSync.dmg
-          linux-deb/GDSync.deb
-          linux-arch/GDSync.pkg.tar.gz
-          linux-appimage/GDSync.AppImage
-        draft: false
-        prerelease: false
+      id: create_release
+      uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+
+    - name: Upload Windows Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./windows-build/GDSync.exe
+        asset_name: GDSync.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload macOS Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./macos-build/GDSync.dmg
+        asset_name: GDSync.dmg
+        asset_content_type: application/octet-stream
+
+    - name: Upload Linux Release Asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./linux-build/GDSync-linux
+        asset_name: GDSync-linux
+        asset_content_type: application/octet-stream
+
+    - name: Upload Desktop File
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./gdsync.desktop
+        asset_name: gdsync.desktop
+        asset_content_type: text/plain
+
+    - name: Upload Icon
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./icon.png
+        asset_name: icon.png
+        asset_content_type: image/png
+
+  update-aur:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH for AUR
+      run: |
+        mkdir -p ~/.ssh
+        echo "${{ secrets.AUR_SSH_KEY }}" > ~/.ssh/aur
+        chmod 600 ~/.ssh/aur
+        ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
+        cat > ~/.ssh/config << EOF
+        Host aur.archlinux.org
+          HostName aur.archlinux.org
+          User aur
+          IdentityFile ~/.ssh/aur
+        EOF
+
+    - name: Clone AUR repository
+      run: |
+        git clone ssh://aur@aur.archlinux.org/gdsync-bin.git aur-repo
+
+    - name: Update AUR package
+      run: |
+        cd aur-repo
+        
+        # Get version from git tag
+        VERSION=${GITHUB_REF#refs/tags/v}
+        
+        # Update PKGBUILD
+        cat > PKGBUILD << 'EOF'
+        # Maintainer: MalikHw47 <help.malicorporation@gmail.com>
+        pkgname=gdsync-bin
+        pkgver=${VERSION}
+        pkgrel=1
+        pkgdesc="A PyQt6-based tool for syncing Geometry Dash save data between PC and Android devices"
+        arch=('x86_64')
+        url="https://github.com/MalikHw/gdsync"
+        license=('custom')
+        depends=('android-tools')
+        provides=('gdsync')
+        conflicts=('gdsync')
+        source=("${pkgname}-${pkgver}::${url}/releases/download/v${pkgver}/GDSync-linux"
+                "${pkgname}-${pkgver}.desktop::${url}/releases/download/v${pkgver}/gdsync.desktop"
+                "${pkgname}-${pkgver}.png::${url}/releases/download/v${pkgver}/icon.png")
+        sha256sums=('SKIP'
+                    'SKIP'
+                    'SKIP')
+
+        package() {
+            # Install the binary
+            install -Dm755 "${srcdir}/${pkgname}-${pkgver}" "${pkgdir}/usr/bin/gdsync"
+            
+            # Install desktop file
+            install -Dm644 "${srcdir}/${pkgname}-${pkgver}.desktop" "${pkgdir}/usr/share/applications/gdsync.desktop"
+            
+            # Install icon
+            install -Dm644 "${srcdir}/${pkgname}-${pkgver}.png" "${pkgdir}/usr/share/pixmaps/gdsync.png"
+        }
+        EOF
+        
+        # Replace VERSION placeholder
+        sed -i "s/\${VERSION}/${VERSION}/g" PKGBUILD
+        
+        # Generate .SRCINFO
+        makepkg --printsrcinfo > .SRCINFO
+        
+        # Configure Git
+        git config user.name "MalikHw47"
+        git config user.email "help.malicorporation@gmail.com"
+        
+        # Commit and push changes
+        git add PKGBUILD .SRCINFO
+        git commit -m "Update to version ${VERSION}"
+        git push origin master
