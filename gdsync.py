@@ -7,9 +7,120 @@ import shutil
 import threading
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                             QHBoxLayout, QPushButton, QRadioButton, QButtonGroup,
-                            QLabel, QTextEdit, QFileDialog, QMessageBox, QProgressBar)
+                            QLabel, QTextEdit, QFileDialog, QMessageBox, QProgressBar,
+                            QDialog, QDialogButtonBox, QLineEdit, QComboBox)
 from PyQt6.QtCore import Qt, QProcess, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon, QPixmap, QFont
+
+class InstallationSetupDialog(QDialog):
+    """Dialog for setting up GD installation path"""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Geometry Dash Installation Setup")
+        self.setFixedSize(500, 300)
+        self.selected_path = ""
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Title
+        title_label = QLabel("Select your Geometry Dash installation type:")
+        title_font = QFont()
+        title_font.setPointSize(12)
+        title_font.setBold(True)
+        title_label.setFont(title_font)
+        layout.addWidget(title_label)
+        
+        # Installation type selection
+        self.installation_combo = QComboBox()
+        self.installation_combo.addItems([
+            "Wine (Default)",
+            "Steam with Proton",
+            "Manual/Custom Path"
+        ])
+        self.installation_combo.currentTextChanged.connect(self.on_installation_changed)
+        layout.addWidget(self.installation_combo)
+        
+        # Path display and browse
+        path_layout = QHBoxLayout()
+        self.path_label = QLabel("Path:")
+        self.path_edit = QLineEdit()
+        self.path_edit.setReadOnly(True)
+        self.browse_btn = QPushButton("Browse...")
+        self.browse_btn.clicked.connect(self.browse_path)
+        self.browse_btn.setEnabled(False)  # Initially disabled
+        
+        path_layout.addWidget(self.path_label)
+        path_layout.addWidget(self.path_edit)
+        path_layout.addWidget(self.browse_btn)
+        layout.addLayout(path_layout)
+        
+        # Info text
+        self.info_text = QTextEdit()
+        self.info_text.setReadOnly(True)
+        self.info_text.setMaximumHeight(120)
+        layout.addWidget(self.info_text)
+        
+        # Buttons
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+        
+        self.setLayout(layout)
+        
+        # Initialize with default selection
+        self.on_installation_changed("Wine (Default)")
+    
+    def on_installation_changed(self, installation_type):
+        """Handle installation type change"""
+        home_dir = os.path.expanduser("~")
+        username = os.environ.get("USER", "user")
+        
+        if installation_type == "Wine (Default)":
+            self.selected_path = os.path.join(home_dir, ".wine", "drive_c", "users", username, "AppData", "Local", "GeometryDash")
+            self.browse_btn.setEnabled(False)
+            self.info_text.setText(
+                "Default Wine installation path.\n"
+                "This is used when GD is installed through Wine directly.\n"
+                f"Path: {self.selected_path}"
+            )
+        elif installation_type == "Steam with Proton":
+            self.selected_path = os.path.join(home_dir, ".local", "share", "Steam", "steamapps", "compatdata", "322170", "pfx", "drive_c", "users", "steamuser", "AppData", "Local", "GeometryDash")
+            self.browse_btn.setEnabled(False)
+            self.info_text.setText(
+                "Steam with Proton installation path.\n"
+                "This is used when GD is installed through Steam on Linux.\n"
+                f"Path: {self.selected_path}\n\n"
+                "Note: Steam App ID 322170 is for Geometry Dash"
+            )
+        else:  # Manual/Custom Path
+            self.selected_path = ""
+            self.browse_btn.setEnabled(True)
+            self.info_text.setText(
+                "Custom installation path.\n"
+                "Use this if you have a custom Wine prefix or different installation.\n"
+                "Click 'Browse...' to select your GeometryDash folder containing the .dat files."
+            )
+        
+        self.path_edit.setText(self.selected_path)
+    
+    def browse_path(self):
+        """Browse for custom path"""
+        path = QFileDialog.getExistingDirectory(
+            self, 
+            "Select Geometry Dash Data Folder",
+            os.path.expanduser("~"),
+            QFileDialog.Option.ShowDirsOnly
+        )
+        if path:
+            self.selected_path = path
+            self.path_edit.setText(path)
+    
+    def get_selected_path(self):
+        """Get the selected installation path"""
+        return self.selected_path
 
 class SyncWorker(QThread):
     """Worker thread for sync operations to prevent UI freezing"""
@@ -33,13 +144,15 @@ class SyncWorker(QThread):
 class GDSync(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("gdsync v3.0.2 by MalikHw47")
-        self.setFixedSize(600, 450)
+        self.setWindowTitle("gdsync v3.1.0 by MalikHw47")
+        self.setFixedSize(600, 500)
         self.process = None
         self.adb_path = ""
+        self.gd_pc_path = ""
         self.sync_worker = None
         self.init_ui()
         self.detect_adb()
+        self.setup_gd_installation()
         self.log("GDSync initialized. Ready for operation.")
         
     def init_ui(self):
@@ -48,7 +161,7 @@ class GDSync(QMainWindow):
         
         # Title section (replacing banner)
         title_layout = QVBoxLayout()
-        self.title_label = QLabel("GDSync V3..0.2 by MalikHw47")
+        self.title_label = QLabel("GDSync v3.1.0 by MalikHw47")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Style the title
@@ -68,6 +181,25 @@ class GDSync(QMainWindow):
         
         title_layout.addWidget(self.title_label)
         main_layout.addLayout(title_layout)
+        
+        # Installation info section
+        install_layout = QVBoxLayout()
+        self.install_label = QLabel("GD Installation: Not configured")
+        self.install_label.setStyleSheet("""
+            QLabel {
+                background-color: #34495e;
+                color: white;
+                padding: 10px;
+                border-radius: 5px;
+                margin: 5px;
+            }
+        """)
+        self.setup_btn = QPushButton("Setup GD Installation")
+        self.setup_btn.clicked.connect(self.setup_gd_installation)
+        
+        install_layout.addWidget(self.install_label)
+        install_layout.addWidget(self.setup_btn)
+        main_layout.addLayout(install_layout)
         
         # Logs section
         logs_layout = QVBoxLayout()
@@ -128,7 +260,7 @@ class GDSync(QMainWindow):
         self.donate_btn.setFixedSize(120, 40)
         self.donate_btn.clicked.connect(self.open_donate)
         
-        self.sync_btn = QPushButton("sync")
+        self.sync_btn = QPushButton("Sync")
         self.sync_btn.setFixedSize(120, 40)
         self.sync_btn.clicked.connect(self.start_sync)
         
@@ -140,6 +272,62 @@ class GDSync(QMainWindow):
         main_layout.addLayout(button_layout)
         
         self.setCentralWidget(central_widget)
+    
+    def setup_gd_installation(self):
+        """Setup Geometry Dash installation path"""
+        dialog = InstallationSetupDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            path = dialog.get_selected_path()
+            if path and self.validate_gd_installation(path):
+                self.gd_pc_path = path
+                self.install_label.setText(f"GD Installation: {path}")
+                self.log(f"GD installation path set to: {path}")
+            elif path:
+                self.log(f"Invalid GD installation path: {path}")
+    
+    def validate_gd_installation(self, path):
+        """Validate GD installation and check for required files"""
+        if not os.path.exists(path):
+            self.log(f"Path does not exist: {path}")
+            QMessageBox.critical(
+                self,
+                "Invalid Path",
+                f"The selected path does not exist:\n{path}"
+            )
+            return False
+        
+        # Check for CCGameManager.dat file
+        ccgamemanager_path = os.path.join(path, "CCGameManager.dat")
+        
+        if not os.path.exists(ccgamemanager_path):
+            reply = QMessageBox.question(
+                self,
+                "GD Data Files Not Found",
+                f"CCGameManager.dat was not found in:\n{path}\n\n"
+                "This usually means Geometry Dash hasn't been run yet, or the path is incorrect.\n\n"
+                "Would you like to:\n"
+                "• Continue anyway (files will be created during sync)\n"
+                "• Cancel and run GD first\n\n"
+                "Note: It's recommended to run GD at least once to create the initial data files.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            
+            if reply == QMessageBox.StandardButton.No:
+                QMessageBox.information(
+                    self,
+                    "Run Geometry Dash First",
+                    "Please run Geometry Dash at least once and close it normally.\n"
+                    "This will create the necessary data files for syncing.\n\n"
+                    "After running GD, come back and setup the installation path again."
+                )
+                return False
+            else:
+                self.log("Warning: CCGameManager.dat not found. Continuing anyway...")
+                return True
+        else:
+            self.log("CCGameManager.dat found. Installation path validated.")
+            return True
     
     def get_resource_path(self):
         """Get absolute path to resource, works for dev and for PyInstaller"""
@@ -363,21 +551,12 @@ ADB Installation Tutorial for Windows:
             )
     
     def get_geometry_dash_paths(self):
-        """Get platform-specific paths for Geometry Dash data"""
-        system = platform.system()
-        home_dir = os.path.expanduser("~")
-        
-        if system == "Windows":
-            # Windows path
-            gd_pc_path = os.path.join("C:", "users", os.environ.get("USER", ""), "AppData", "Local", "GeometryDash")
-        else:
-            # Linux path (assuming using Wine)
-            gd_pc_path = os.path.join(home_dir, ".wine", "drive_c", "users", os.environ.get("USER", ""), "AppData", "Local", "GeometryDash")
-        
-        # Android path is the same in both OS
+        """Get paths for Geometry Dash data"""
+        # Android path is always the same
         gd_android_path = "/storage/emulated/0/Android/media/com.geode.launcher/save"
         
-        return gd_pc_path, gd_android_path
+        # Use the configured PC path
+        return self.gd_pc_path, gd_android_path
     
     def should_exclude_path(self, file_path):
         """Check if a file/folder should be excluded from sync"""
@@ -585,7 +764,11 @@ ADB Installation Tutorial for Windows:
     def start_sync(self):
         """Start the sync process based on selected options"""
         if not self.adb_path:
-            QMessageBox.critical(self, "Error", "ADB path not set. Please configure in Settings.")
+            QMessageBox.critical(self, "Error", "ADB path not set. Please install ADB first.")
+            return
+        
+        if not self.gd_pc_path:
+            QMessageBox.critical(self, "Error", "GD installation path not set. Please setup GD installation first.")
             return
         
         if self.sync_worker and self.sync_worker.isRunning():
