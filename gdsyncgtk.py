@@ -201,7 +201,7 @@ class SyncWorker(GObject.Object):
 class GDSync(Adw.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app)
-        self.set_title("gdsync v3.1.0 by MalikHw47")
+        self.set_title("gdsync v4.0.0 by MalikHw47")
         self.set_default_size(600, 600)
         self.adb_path = ""
         self.gd_pc_path = ""
@@ -222,7 +222,7 @@ class GDSync(Adw.ApplicationWindow):
         # Header/Title section
         header_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
         
-        title_label = Gtk.Label(label="GDSync v3.1.0 by MalikHw47")
+        title_label = Gtk.Label(label="GDSync v4.0.0 by MalikHw47")
         title_label.add_css_class("title-1")
         title_label.set_halign(Gtk.Align.CENTER)
         
