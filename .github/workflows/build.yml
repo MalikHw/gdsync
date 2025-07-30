@@ -52,11 +52,11 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install PyQt6 pyinstaller Pillow
+        pip install gobject pyinstaller Pillow
 
     - name: Build with PyInstaller
       run: |
-        pyinstaller --onefile --icon=icon.png --name=gdsync-linux gdsync.py
+        pyinstaller --onefile --icon=icon.png --name=gdsync-linux gdsyncgtk.py
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
@@ -64,63 +64,8 @@ jobs:
         name: linux-build
         path: dist/gdsync-linux
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.11'
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install PyQt6 pyinstaller Pillow
-
-    - name: Convert icon for macOS
-      run: |
-        python -c "
-        from PIL import Image
-        import os
-        
-        # Create iconset directory
-        os.makedirs('icon.iconset', exist_ok=True)
-        
-        # Load the PNG image
-        img = Image.open('icon.png')
-        
-        # Generate different sizes for iconset
-        sizes = [16, 32, 64, 128, 256, 512, 1024]
-        for size in sizes:
-            resized = img.resize((size, size), Image.Resampling.LANCZOS)
-            resized.save(f'icon.iconset/icon_{size}x{size}.png')
-            if size <= 512:  # Also create @2x versions for smaller sizes
-                resized.save(f'icon.iconset/icon_{size//2}x{size//2}@2x.png')
-        "
-        
-        # Convert iconset to icns
-        iconutil -c icns icon.iconset
-
-    - name: Build with PyInstaller
-      run: |
-        pyinstaller --onefile --windowed --icon=icon.icns --name=gdsync gdsync.py
-
-    - name: Create DMG
-      run: |
-        mkdir -p dist-dmg
-        cp -r dist/gdsync.app dist-dmg/
-        hdiutil create -volname "GDSync" -srcfolder dist-dmg -ov -format UDZO dist/gdsync.dmg
-
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: macos-build
-        path: dist/gdsync.dmg
-
   release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     
     steps:
@@ -136,7 +81,6 @@ jobs:
       with:
         files: |
           ./windows-build/gdsync.exe
-          ./macos-build/gdsync.dmg
           ./linux-build/gdsync-linux
           ./gdsync.desktop
           ./icon.png
