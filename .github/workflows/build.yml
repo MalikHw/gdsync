@@ -120,7 +120,7 @@ jobs:
         VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\/v//')
         
         # Update PKGBUILD
-        cat > PKGBUILD << EOF
+        cat > PKGBUILD << 'EOF'
         # Maintainer: MalikHw47 <help.malicorporation@gmail.com>
         pkgname=gdsync-bin
         pkgver=${VERSION}
