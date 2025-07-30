@@ -144,7 +144,7 @@ class SyncWorker(QThread):
 class GDSync(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("gdsync v3.1.0 by MalikHw47")
+        self.setWindowTitle("gdsync v4.0.0 by MalikHw47")
         self.setFixedSize(600, 500)
         self.process = None
         self.adb_path = ""
@@ -161,7 +161,7 @@ class GDSync(QMainWindow):
         
         # Title section (replacing banner)
         title_layout = QVBoxLayout()
-        self.title_label = QLabel("GDSync v3.1.0 by MalikHw47")
+        self.title_label = QLabel("GDSync v4.0.0 by MalikHw47")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Style the title
