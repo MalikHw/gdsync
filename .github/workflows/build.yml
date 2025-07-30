@@ -82,8 +82,6 @@ jobs:
         files: |
           ./windows-build/gdsync.exe
           ./linux-build/gdsync-linux
-          ./gdsync.desktop
-          ./icon.png
 
   update-aur:
     needs: release
@@ -134,22 +132,28 @@ jobs:
         depends=('python' 'python-gobject' 'android-tools' 'gtk4' 'libadwaita')
         provides=('gdsync')
         conflicts=('gdsync')
-        source=("\${pkgname}-\${pkgver}::\${url}/releases/download/v\${pkgver}/gdsync-linux"
-                "\${pkgname}-\${pkgver}.desktop::\${url}/releases/download/v\${pkgver}/gdsync.desktop"
-                "\${pkgname}-\${pkgver}.png::\${url}/releases/download/v\${pkgver}/icon.png")
-        sha256sums=('SKIP'
-                    'SKIP'
-                    'SKIP')
+        source=("gdsyncgtk.py::https://raw.githubusercontent.com/MalikHw/gdsync/refs/heads/main/gdsyncgtk.py")
+        sha256sums=('SKIP')
 
         package() {
-            # Install the binary
-            install -Dm755 "\${srcdir}/\${pkgname}-\${pkgver}" "\${pkgdir}/usr/bin/gdsync"
+            # Create wrapper script
+            mkdir -p "\${pkgdir}/usr/bin"
+            cat > "\${pkgdir}/usr/bin/gdsync" << 'EOF2'
+#!/bin/sh
+exec python /usr/share/gdsync/gdsyncgtk.py
+EOF2
+            chmod +x "\${pkgdir}/usr/bin/gdsync"
             
-            # Install desktop file
-            install -Dm644 "\${srcdir}/\${pkgname}-\${pkgver}.desktop" "\${pkgdir}/usr/share/applications/gdsync.desktop"
+            # Install the python script
+            install -Dm755 "\${srcdir}/gdsyncgtk.py" "\${pkgdir}/usr/share/gdsync/gdsyncgtk.py"
             
-            # Install icon
-            install -Dm644 "\${srcdir}/\${pkgname}-\${pkgver}.png" "\${pkgdir}/usr/share/pixmaps/gdsync.png"
+            # Install desktop file (from GitHub raw)
+            mkdir -p "\${pkgdir}/usr/share/applications"
+            curl -sL "https://raw.githubusercontent.com/MalikHw/gdsync/refs/heads/main/gdsync.desktop" -o "\${pkgdir}/usr/share/applications/gdsync.desktop"
+            
+            # Install icon (from GitHub raw)
+            mkdir -p "\${pkgdir}/usr/share/pixmaps"
+            curl -sL "https://raw.githubusercontent.com/MalikHw/gdsync/refs/heads/main/icon.png" -o "\${pkgdir}/usr/share/pixmaps/gdsync.png"
         }
         EOF
         
